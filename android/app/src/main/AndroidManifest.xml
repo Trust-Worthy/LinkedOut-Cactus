@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Add this line to enable Camera access -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <application
         android:label="linkedout"
         android:name="${applicationName}"

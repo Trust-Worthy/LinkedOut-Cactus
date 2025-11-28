@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
 import '../../widgets/contact/contact_card.dart';
-// import '../scan/scan_screen.dart'; // We will create this next
+import '../scan/scan_screen.dart'; // We will create this next
 // import '../map/map_screen.dart';   // We will create this later
 
 class HomeScreen extends StatefulWidget {
@@ -40,13 +40,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onFabPressed() {
-    // Navigate to Scan Screen
-    // Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanScreen()))
-    //     .then((_) => _loadContacts()); // Reload list when returning
+  // void _onFabPressed() {
+  //   // Navigate to Scan Screen
+  //   // Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanScreen()))
+  //   //     .then((_) => _loadContacts()); // Reload list when returning
     
-    // TEMPORARY: Add a dummy contact so you can see the list work immediately
-    _addDummyContact();
+  //   // TEMPORARY: Add a dummy contact so you can see the list work immediately
+  //   _addDummyContact();
+  // }
+
+  void _onFabPressed() {
+    Navigator.push(
+      context, 
+      MaterialPageRoute(builder: (_) => const ScanScreen())
+    ).then((_) {
+      // Refresh list when returning from scan
+      _loadContacts(); 
+    });
   }
   
   // Helper for testing without the scanner
