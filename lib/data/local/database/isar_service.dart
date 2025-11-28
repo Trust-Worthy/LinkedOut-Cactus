@@ -5,15 +5,19 @@ import '../../models/contact.dart';
 class IsarService {
   late Future<Isar> db;
 
-  IsarService() {
-    db = openIsar();
-  }
-
   // Singleton Pattern
   static final IsarService _instance = IsarService._internal();
+  
+  // Factory constructor returns the singleton instance
   factory IsarService() => _instance;
-  IsarService._internal();
+  
+  // Static getter for easy access
   static IsarService get instance => _instance;
+
+  // Private named constructor: logic goes here
+  IsarService._internal() {
+    db = openIsar();
+  }
 
   Future<Isar> openIsar() async {
     if (Isar.instanceNames.isEmpty) {
