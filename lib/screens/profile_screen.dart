@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'my_qr.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -45,8 +44,11 @@ class ProfileScreen extends StatelessWidget {
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.grey[800],
-                        backgroundImage: const NetworkImage('https://randomuser.me/api/portraits/men/32.jpg'),
-                        child: null,
+                        child: const Icon(
+                          Icons.person,
+                          size: 60,
+                          color: Colors.white,
+                        ),
                       ),
                       Positioned(
                         bottom: 0,
@@ -152,10 +154,7 @@ class ProfileScreen extends StatelessWidget {
                     icon: Icons.qr_code,
                     title: 'My QR Code',
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const MyQrScreen()),
-                      );
+                      // TODO: Show QR code
                     },
                   ),
                   Divider(height: 1, color: Colors.grey[800], indent: 60),
