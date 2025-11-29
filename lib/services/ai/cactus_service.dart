@@ -20,12 +20,15 @@ class CactusService {
   CactusService._internal();
   static CactusService get instance => _instance;
 
-  bool isInitialized = false;
+  // Track initialization separately
+  bool _isTextReady = false;
+  bool _isVisionReady = false;
+  
   String? visionSlug;
   String? textSlug;
 
   bool isModelReady() {
-    return _visionLM.isLoaded() && _textLM.isLoaded();
+    return _isTextReady && _textLM.isLoaded();
   }
 
   // --- 1. Intelligent Model Selection & Download ---
@@ -37,17 +40,15 @@ class CactusService {
       CactusTelemetry.setTelemetryToken('a83c7f7a-43ad-4823-b012-cbeb587ae788');
       onProgress(0.0, "Analyzing available models...");
       
-      final models = await _visionLM.getModels(); // List is same for both
+      final models = await _visionLM.getModels(); 
       
-      // A. Select Best Vision Model (Prioritize Liquid/LFM)
+      // Select Models
       final visionModel = models.firstWhere(
         (m) => m.slug.contains('lfm') && m.supportsVision,
         orElse: () => models.firstWhere((m) => m.supportsVision),
       );
       visionSlug = visionModel.slug;
 
-      // B. Select Best Text Model (Prioritize Qwen or Gemma for reasoning)
-      // We explicitly exclude the vision model to ensure we get a dedicated text expert
       final textModel = models.firstWhere(
         (m) => (m.slug.contains('qwen') || m.slug.contains('gemma')) && !m.supportsVision,
         orElse: () => models.firstWhere((m) => !m.supportsVision && m.slug != visionSlug),
@@ -57,7 +58,7 @@ class CactusService {
       _logger.i("👁️ Vision Model: $visionSlug");
       _logger.i("🧠 Text Model:   $textSlug");
 
-      // --- Download Phase 1: The Brain (Text) ---
+      // Download Text Model (Brain)
       if (!textModel.isDownloaded) {
         await _textLM.downloadModel(
           model: textSlug!,
@@ -65,7 +66,7 @@ class CactusService {
         );
       }
 
-      // --- Download Phase 2: The Eyes (Vision) ---
+      // Download Vision Model (Eyes)
       if (!visionModel.isDownloaded) {
         await _visionLM.downloadModel(
           model: visionSlug!,
@@ -74,7 +75,9 @@ class CactusService {
       }
 
       onProgress(1.0, "Initializing AI Systems...");
-      await initialize();
+      // We perform a light init here to ensure configs are ready, 
+      // but we might not load weights into RAM until needed.
+      await _ensureModelSelection();
       
     } catch (e) {
       _logger.e("Download Exception: $e");
@@ -86,53 +89,54 @@ class CactusService {
     if (e) {
       _logger.e("Download Error: $s");
     } else {
-      // Map 0.0-1.0 to startRange-endRange
       final range = endRange - startRange;
       final actualProgress = startRange + ((p ?? 0.0) * range);
       callback(actualProgress, s);
     }
   }
 
-  Future<void> initialize() async {
-    if (isInitialized) return;
-    try {
-      // --- FIX: Auto-Select Models if App Restarted ---
-      // If we skipped onboarding/download, these will be null. We must re-select them.
-      if (visionSlug == null || textSlug == null) {
-        _logger.i("Restoring model selection...");
-        final models = await _visionLM.getModels();
-        
-        visionSlug = models.firstWhere(
-          (m) => m.slug.contains('lfm') && m.supportsVision,
-          orElse: () => models.firstWhere((m) => m.supportsVision),
-        ).slug;
+  /// Helper to ensure we know WHICH models to use, even after app restart
+  Future<void> _ensureModelSelection() async {
+    if (visionSlug != null && textSlug != null) return;
 
-        textSlug = models.firstWhere(
-          (m) => (m.slug.contains('qwen') || m.slug.contains('gemma')) && !m.supportsVision,
-          orElse: () => models.firstWhere((m) => !m.supportsVision && m.slug != visionSlug),
-        ).slug;
-        
-        _logger.i("Restored: Vision=$visionSlug, Text=$textSlug");
-      }
+    _logger.i("Restoring model selection...");
+    final models = await _visionLM.getModels();
+    
+    visionSlug = models.firstWhere(
+      (m) => m.slug.contains('lfm') && m.supportsVision,
+      orElse: () => models.firstWhere((m) => m.supportsVision),
+    ).slug;
 
-      _logger.i("Initializing Text Engine ($textSlug)...");
-      await _textLM.initializeModel(params: CactusInitParams(model: textSlug!));
-      
-      _logger.i("Initializing Vision Engine ($visionSlug)...");
-      await _visionLM.initializeModel(params: CactusInitParams(model: visionSlug!));
-      
-      isInitialized = true;
-      _logger.i("✅ Both AI Systems Ready");
-    } catch (e) {
-      _logger.e("Init Error: $e");
-      rethrow;
-    }
+    textSlug = models.firstWhere(
+      (m) => (m.slug.contains('qwen') || m.slug.contains('gemma')) && !m.supportsVision,
+      orElse: () => models.firstWhere((m) => !m.supportsVision && m.slug != visionSlug),
+    ).slug;
+  }
+
+  // --- LAZY LOADERS ---
+
+  Future<void> _initTextEngine() async {
+    if (_isTextReady && _textLM.isLoaded()) return;
+    await _ensureModelSelection();
+    
+    _logger.i("🧠 Booting Text Engine ($textSlug)...");
+    await _textLM.initializeModel(params: CactusInitParams(model: textSlug!));
+    _isTextReady = true;
+  }
+
+  Future<void> _initVisionEngine() async {
+    if (_isVisionReady && _visionLM.isLoaded()) return;
+    await _ensureModelSelection();
+
+    _logger.i("👁️ Booting Vision Engine ($visionSlug)...");
+    await _visionLM.initializeModel(params: CactusInitParams(model: visionSlug!));
+    _isVisionReady = true;
   }
 
   // --- 2. Vision Tasks (Use Vision LM) ---
 
   Future<String> scanBusinessCard(String imagePath) async {
-    if (!isInitialized) await initialize();
+    await _initVisionEngine(); // Only load Vision if strictly needed
     _logger.i("Running OCR with $visionSlug...");
     
     final result = await _visionLM.generateCompletion(
@@ -147,7 +151,7 @@ class CactusService {
   // --- 3. Text Tasks (Use Text LM) ---
 
   Future<Map<String, String?>> parseCardText(String rawText) async {
-    if (!isInitialized) await initialize();
+    await _initTextEngine(); // Only load Text model (Fast!)
     _logger.i("Parsing text with $textSlug...");
 
     const prompt = """
@@ -168,10 +172,9 @@ class CactusService {
   // --- 4. Embeddings (Use Text LM - CRITICAL FOR RAG) ---
 
   Future<List<double>> getEmbedding(String text) async {
-    if (!isInitialized) await initialize();
+    await _initTextEngine(); // Only load Text model
 
     try {
-      // Text models produce MUCH better embeddings than vision models
       final result = await _textLM.generateEmbedding(text: text);
       if (result.success) return result.embeddings;
       throw Exception("Embedding failed");
@@ -184,7 +187,7 @@ class CactusService {
   // --- 5. RAG Chat (Use Text LM) ---
 
   Future<String> generateChatResponse(List<ChatMessage> messages) async {
-    if (!isInitialized) await initialize();
+    await _initTextEngine();
     _logger.i("Thinking with $textSlug...");
 
     final result = await _textLM.generateCompletion(
@@ -198,7 +201,7 @@ class CactusService {
   // --- 6. Chat Streaming (Use Text LM) ---
   
   Stream<String> streamChat(List<ChatMessage> history) async* {
-    if (!isInitialized) await initialize();
+    await _initTextEngine();
 
     final result = await _textLM.generateCompletionStream(
       messages: history,

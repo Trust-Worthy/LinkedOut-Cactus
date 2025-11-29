@@ -4,6 +4,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:provider/provider.dart';
 import '../../../services/ai/cactus_service.dart';
 import '../../../services/location/location_service.dart';
+import '../../../core/utils/business_card_extractor.dart'; // Import the new extractor
 import 'scan_result_screen.dart';
 
 class ScanScreen extends StatefulWidget {
@@ -228,36 +229,60 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     _showLoadingDialog();
 
     try {
-      // 3. Parallel Execution: AI Parsing + GPS Location
-      // We use your existing Services here.
+      // 3. STEP A: Run Regex Extraction (Instant)
+      // This happens locally and synchronously before AI potentially takes time
+      final regexData = BusinessCardExtractor.extract(rawText);
+
+      // 4. STEP B: Parallel Execution (AI Parsing + GPS Location)
+      // We start these now.
       final aiFuture = CactusService.instance.parseCardText(rawText);
       final locFuture = LocationService.instance.getCurrentLocation();
 
       final results = await Future.wait([aiFuture, locFuture]);
       
-      final parsedData = results[0] as Map<String, String?>;
+      final aiData = results[0] as Map<String, String?>;
       final position = results[1] as dynamic; // Cast later
 
-      // 4. Resolve Address (Offline)
-      String? address;
+      // 5. Merge Data Strategy
+      // - Regex is better for strict formats (Email, Phone, Links)
+      // - AI is better for fuzzy context (Name, Company, Title)
+      final mergedData = {
+        'name': aiData['name'] ?? regexData.name,
+        'company': aiData['company'] ?? regexData.company,
+        'title': aiData['title'] ?? regexData.title,
+        
+        // Prioritize Regex for these, fallback to AI
+        'email': regexData.email ?? aiData['email'],
+        'phone': regexData.phone ?? aiData['phone'],
+        'linkedin': regexData.linkedin ?? aiData['linkedin'],
+        
+        // Combine notes
+        'notes': (aiData['notes'] ?? "") + "\n\nRaw Scan:\n" + rawText,
+      };
+
+      // 6. Resolve Address (Offline)
+      String? address = regexData.address; // Try regex address first
       double? lat, lng;
       
       if (position != null) {
         lat = position.latitude;
         lng = position.longitude;
-        address = await LocationService.instance.getAddressLabel(lat!, lng!);
+        // If we have GPS, prioritize the GPS-derived address over the Regex text address
+        final gpsAddress = await LocationService.instance.getAddressLabel(lat!, lng!);
+        if (gpsAddress != null) {
+          address = gpsAddress;
+        }
       }
 
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
 
-      // 5. Navigate to your Save Form (ScanResultScreen)
-      // We pass the data we just gathered.
+      // 7. Navigate to Save Form (ScanResultScreen)
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => ScanResultScreen(
-            initialData: parsedData,
+            initialData: mergedData,
             rawText: rawText,
             initialLatitude: lat,
             initialLongitude: lng,
@@ -287,8 +312,8 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               children: [
                 CircularProgressIndicator(color: Color(0xFF1F6DB4)),
                 SizedBox(height: 16),
-                Text("AI is structuring data..."),
-                Text("Acquiring GPS...", style: TextStyle(fontSize: 10, color: Colors.grey)),
+                Text("Analyzing card..."),
+                Text("Regex + AI + GPS running...", style: TextStyle(fontSize: 10, color: Colors.grey)),
               ],
             ),
           ),
