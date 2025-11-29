@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_svg/flutter_svg.dart'; // Ensure you have this dependency or remove if not using SVG here specifically
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
 import '../../../services/search/smart_search_service.dart';
@@ -10,8 +10,9 @@ import '../scan/scan_screen.dart';
 import '../scan/scan_result_screen.dart';
 import '../chat/chat_screen.dart';
 import '../timeline/timeline_screen.dart';
-// Note: We are using the screens we already built. 
-// If you want to use his specific ProfileScreen, import it here.
+import '../contact/contact_detail_screen.dart';
+// FIX: Import Profile Screen
+import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Uses the SmartSearchService (Router Agent) we built earlier
+  // Uses the SmartSearchService (Router Agent)
   Future<void> _handleSearch(String query) async {
     if (query.isEmpty) {
       setState(() => _filteredContacts = _allContacts);
@@ -85,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onManualAddPressed() {
-    // Reusing the ScanResultScreen for manual entry guarantees Embeddings are generated
+    // Reusing the ScanResultScreen for manual entry
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -116,10 +117,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                 child: Row(
                   children: [
-                    // Profile Button (Placeholder)
+                    // Profile Button
                     GestureDetector(
                       onTap: () {
-                        // TODO: Navigate to ProfileScreen
+                        // FIX: Navigate to Profile Screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ProfileScreen())
+                        );
                       },
                       child: CircleAvatar(
                         radius: 20,
@@ -292,8 +297,10 @@ class _HomeScreenState extends State<HomeScreen> {
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
-              // TODO: Navigate to Contact Detail Screen
-              // Navigator.push(...)
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ContactDetailScreen(contact: contact))
+              ).then((_) => _loadContacts());
             },
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
