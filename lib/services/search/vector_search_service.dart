@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:cactus/cactus.dart';
 import '../../data/models/contact.dart';
 import '../../data/repositories/contact_repository.dart';
 import '../../core/utils/vector_utils.dart';
@@ -11,92 +10,61 @@ class VectorSearchService {
 
   VectorSearchService(this._repository, this._aiService);
 
-  /// 1. SEMANTIC SEARCH (Retrieval)
-  Future<List<Contact>> search(String query, {int limit = 5}) async {
+  /// Pure Vector Search
+  /// [threshold]: 0.0 to 1.0. Higher = Stricter matches.
+  /// Recommended starting point: 0.25
+  Future<List<Contact>> search(String query, {double threshold = 0.25, int limit = 10}) async {
+    // 1. Get All Data
     final allContacts = await _repository.getAllContacts();
-    
-    // Safety check for empty DB
     if (allContacts.isEmpty) return [];
 
-    // 1. Embed the User's Query
+    debugPrint('🔍 Vector Search: "$query" (Strictness: $threshold)');
+
+    // 2. Generate Query Embedding
     final queryEmbedding = await _aiService.getEmbedding(query);
     
+    // Safety: If embedding fails (empty string or model error), fallback to keyword
     if (queryEmbedding.isEmpty) {
-      // Fallback to keyword if AI fails
-      return _keywordSearch(allContacts, query, limit);
+      debugPrint('⚠️ Embedding failed/empty. Using keyword fallback.');
+      return _keywordFallback(allContacts, query);
     }
 
-    // 2. Score Matches (Cosine Similarity)
+    // 3. Score & Rank
     List<MapEntry<Contact, double>> scoredContacts = [];
     
     for (var contact in allContacts) {
       if (contact.embedding != null) {
-        // Dimension Mismatch Check
+        // Dimension Check
         if (contact.embedding!.length != queryEmbedding.length) {
+          debugPrint('⚠️ Dimension mismatch: Contact ${contact.id} has ${contact.embedding!.length}, Query has ${queryEmbedding.length}');
           continue; 
         }
 
         final score = VectorUtils.cosineSimilarity(queryEmbedding, contact.embedding!);
+        
+        // Debugging logs to help you fine-tune
+        // debugPrint('   - ${contact.name}: $score'); 
 
-        // RELAXED THRESHOLD: 0.15 allows for typos and loose associations
-        if (score > 0.15) { 
+        if (score > threshold) { 
           scoredContacts.add(MapEntry(contact, score));
         }
       }
     }
 
-    // 3. Fallback Mechanism
-    if (scoredContacts.isEmpty) {
-       return _keywordSearch(allContacts, query, limit);
-    }
-
-    // 4. Sort & Filter
+    // 4. Sort (Highest Score First)
     scoredContacts.sort((a, b) => b.value.compareTo(a.value));
+    
+    debugPrint('✅ Found ${scoredContacts.length} matches above threshold.');
+
     return scoredContacts.take(limit).map((e) => e.key).toList();
   }
 
-  List<Contact> _keywordSearch(List<Contact> contacts, String query, int limit) {
+  List<Contact> _keywordFallback(List<Contact> contacts, String query) {
     final lowerQuery = query.toLowerCase();
-    return contacts.where((contact) {
-      final text = "${contact.name} ${contact.company ?? ''} ${contact.title ?? ''} ${contact.addressLabel ?? ''}".toLowerCase();
-      return text.contains(lowerQuery);
-    }).take(limit).toList();
-  }
-
-  /// 2. RAG GENERATION (The "Smart" Part)
-  Future<String> askYourNetwork(String userQuestion) async {
-    // A. RETRIEVE: Find relevant contacts from Isar
-    final relevantContacts = await search(userQuestion, limit: 5);
-    
-    if (relevantContacts.isEmpty) {
-      return "I searched your network but couldn't find anyone matching that description.";
-    }
-
-    // B. AUGMENT: Create a dense, information-rich context block
-    // We include the ID so the LLM can reference it
-    String contextData = relevantContacts.map((c) => 
-      "ID:${c.id} | Name:${c.name} | Role:${c.title ?? 'N/A'} @ ${c.company ?? 'N/A'} | Loc:${c.addressLabel ?? 'N/A'} | Notes:${c.notes ?? ''}"
-    ).join("\n");
-
-    // C. GENERATE: "Router" Style Prompt
-    // We instruct the AI to act as a strict data fetcher, not a conversationalist.
-    final messages = [
-      ChatMessage(
-        role: "system", 
-        content: """
-You are a precision networking assistant. 
-1. Answer the user's question using ONLY the provided Context.
-2. Be extremely concise. Do not use filler words.
-3. Format every person found as: - [Name](ID) - 1 sentence detail.
-4. If the user asks for a list (e.g. 'who in Colorado'), just list them.
-        """.trim()
-      ),
-      ChatMessage(
-        role: "user", 
-        content: "Context:\n$contextData\n\nQuestion: $userQuestion"
-      )
-    ];
-
-    return await _aiService.generateChatResponse(messages);
+    return contacts.where((c) => 
+      c.name.toLowerCase().contains(lowerQuery) || 
+      (c.company?.toLowerCase().contains(lowerQuery) ?? false) ||
+      (c.notes?.toLowerCase().contains(lowerQuery) ?? false)
+    ).toList();
   }
 }

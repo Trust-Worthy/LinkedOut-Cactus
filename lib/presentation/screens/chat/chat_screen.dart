@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../data/models/contact.dart';
-import '../../../services/search/advanced_search_service.dart'; // Use Advanced Service
+import '../../../services/search/vector_search_service.dart'; // Pure Vector Service
 import '../../widgets/contact/contact_card.dart';
 
-// Updated Model for chat messages
 class ChatItem {
   final bool isUser;
   final String? text;
-  // Instead of simple list, we hold the full result object
-  final AdvancedSearchResult? result;
+  final List<Contact>? contacts;
 
-  ChatItem({required this.isUser, this.text, this.result});
+  ChatItem({required this.isUser, this.text, this.contacts});
 }
 
 class ChatScreen extends StatefulWidget {
@@ -26,6 +24,12 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatItem> _messages = [];
   bool _isThinking = false;
 
+  // --- FINE TUNE STRICTNESS HERE ---
+  // 0.1 = Very Loose (Finds anything vaguely related)
+  // 0.25 = Balanced (Good for concepts like "Investor")
+  // 0.5 = Strict (Needs strong semantic match)
+  final double _searchStrictness = 0.20; 
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -37,19 +41,28 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      // Switch to AdvancedSearchService
-      final searchService = Provider.of<AdvancedSearchService>(context, listen: false);
-      final result = await searchService.executeAdvancedQuery(text);
+      final searchService = Provider.of<VectorSearchService>(context, listen: false);
+      
+      // Run Pure Vector Search
+      final results = await searchService.search(text, threshold: _searchStrictness);
 
       setState(() {
-        _messages.add(ChatItem(
-          isUser: false, 
-          result: result, // Pass the rich result object
-        ));
+        if (results.isEmpty) {
+          _messages.add(ChatItem(
+            isUser: false, 
+            text: "No matches found. Try adding more detail or lowering strictness."
+          ));
+        } else {
+          _messages.add(ChatItem(
+            isUser: false, 
+            text: "Found ${results.length} matches:",
+            contacts: results,
+          ));
+        }
       });
     } catch (e) {
       setState(() {
-        _messages.add(ChatItem(isUser: false, text: "Error processing query: $e"));
+        _messages.add(ChatItem(isUser: false, text: "Error: $e"));
       });
     } finally {
       setState(() => _isThinking = false);
@@ -63,11 +76,12 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        title: const Text('AI Assistant', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+        title: const Text('Neural Search', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Column(
         children: [
+          // Chat List
           Expanded(
             child: _messages.isEmpty 
               ? _buildEmptyState()
@@ -78,21 +92,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
           ),
           
+          // Loader
           if (_isThinking) 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
-                children: [
-                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue)),
-                  const SizedBox(width: 12),
-                  Text("Thinking...", style: TextStyle(color: Colors.grey[500], fontSize: 14)),
-                ],
-              ),
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: LinearProgressIndicator(color: Colors.blue, backgroundColor: Colors.grey),
             ),
 
-          // Input Area
+          // Input
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.grey[900],
               border: Border(top: BorderSide(color: Colors.grey[800]!, width: 0.5)),
@@ -101,28 +110,27 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(color: Colors.grey[850], borderRadius: BorderRadius.circular(24)),
-                      child: TextField(
-                        controller: _controller,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          hintText: 'Ask complex queries...',
-                          hintStyle: TextStyle(color: Colors.grey[600]),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        ),
-                        onSubmitted: (_) => _sendMessage(),
+                    child: TextField(
+                      controller: _controller,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Search by concept (e.g. "Investors")',
+                        hintStyle: TextStyle(color: Colors.grey[600]),
+                        border: InputBorder.none,
+                        filled: true,
+                        fillColor: Colors.grey[850],
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        isDense: true,
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                       ),
+                      onSubmitted: (_) => _sendMessage(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_upward, color: Colors.white),
-                      onPressed: _isThinking ? null : _sendMessage,
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.send, color: Colors.blue),
+                    onPressed: _isThinking ? null : _sendMessage,
                   ),
                 ],
               ),
@@ -140,20 +148,11 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-          decoration: BoxDecoration(
-            color: Colors.blue,
-            borderRadius: BorderRadius.circular(20).copyWith(bottomRight: const Radius.circular(4)),
-          ),
-          child: Text(item.text ?? "", style: const TextStyle(color: Colors.white, fontSize: 15)),
+          decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(20)),
+          child: Text(item.text ?? "", style: const TextStyle(color: Colors.white)),
         ),
       );
     } else {
-      // AI Response
-      final result = item.result;
-      final text = item.text ?? result?.summary ?? "No response";
-      final contacts = result?.contacts;
-
       return Align(
         alignment: Alignment.centerLeft,
         child: Container(
@@ -162,72 +161,16 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Summary Text Bubble
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(20).copyWith(bottomLeft: const Radius.circular(4)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(text, style: const TextStyle(color: Colors.white, fontSize: 15)),
-                    // Show reasoning if available
-                    if (result != null && result.parameters.hasAbstractConcept)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text(
-                          "Filtered by: ${result.parameters.abstractConcept}",
-                          style: TextStyle(color: Colors.blue.shade200, fontSize: 12, fontStyle: FontStyle.italic),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              
-              // Contact Cards
-              if (contacts != null && contacts.isNotEmpty)
+              if (item.text != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 12.0),
-                  child: Column(
-                    children: contacts.map((c) {
-                      // Check if we have a specific match score/reason
-                      String? matchReason;
-                      if (result?.scoredContacts != null) {
-                        final match = result!.scoredContacts!.firstWhere(
-                          (sc) => sc.contact.id == c.id, 
-                          orElse: () => ContactWithScore(contact: c, score: 0, reason: "")
-                        );
-                        if (match.reason.isNotEmpty) matchReason = "${(match.score * 100).toInt()}% Match";
-                      }
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: Stack(
-                          children: [
-                            ContactCard(
-                              contact: c, 
-                              onTap: () {
-                                // Navigation handled inside card or here
-                              },
-                            ),
-                            if (matchReason != null)
-                              Positioned(
-                                right: 12,
-                                top: 12,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(4)),
-                                  child: Text(matchReason, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                  padding: const EdgeInsets.only(bottom: 8, left: 4),
+                  child: Text(item.text!, style: const TextStyle(color: Colors.grey)),
                 ),
+              if (item.contacts != null)
+                ...item.contacts!.map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: ContactCard(contact: c, onTap: () {}),
+                )),
             ],
           ),
         ),
@@ -236,6 +179,17 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(child: Text("Ask me anything...", style: TextStyle(color: Colors.grey[600])));
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.hub, size: 64, color: Colors.grey[800]),
+          const SizedBox(height: 16),
+          Text("Neural Network Search", style: TextStyle(color: Colors.grey[500], fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text("Finds concepts, not just keywords.", style: TextStyle(color: Colors.grey[600])),
+        ],
+      ),
+    );
   }
 }
