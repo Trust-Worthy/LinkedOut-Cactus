@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
 import '../../../services/ai/cactus_service.dart';
+import '../../../services/location/location_service.dart'; // Add this import
 
 class ScanResultScreen extends StatefulWidget {
   final Map<String, String?> initialData;
@@ -46,6 +47,25 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     setState(() => _isSaving = true);
 
     try {
+      // 1. Capture Location
+      double? lat;
+      double? lng;
+      String? address = "Scanned Location";
+
+      try {
+        final position = await LocationService.instance.getCurrentLocation();
+        if (position != null) {
+          lat = position.latitude;
+          lng = position.longitude;
+          
+          // Get readable name
+          final label = await LocationService.instance.getAddressLabel(lat, lng);
+          if (label != null) address = label;
+        }
+      } catch (e) {
+        print("Location error: $e"); // Fail silently, save contact anyway
+      }
+
       final contact = Contact(
         name: _nameController.text,
         company: _companyController.text,
@@ -54,15 +74,16 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         notes: _notesController.text,
         metAt: DateTime.now(),
         rawScannedText: widget.rawText,
-        // TODO: Get actual location here in next step
-        addressLabel: "Scanned Location", 
+        
+        // 2. Save Location Data
+        latitude: lat,
+        longitude: lng,
+        addressLabel: address, 
       );
 
-      // This will automatically generate the embedding via our Repo logic!
       await Provider.of<ContactRepository>(context, listen: false).saveContact(contact);
 
       if (mounted) {
-        // Go back to Home (pop twice: ScanScreen and ResultScreen)
         Navigator.pop(context); 
       }
     } catch (e) {
@@ -71,6 +92,38 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
       if (mounted) setState(() => _isSaving = false);
     }
   }
+
+  // Future<void> _saveContact() async {
+  //   if (!_formKey.currentState!.validate()) return;
+
+  //   setState(() => _isSaving = true);
+
+  //   try {
+  //     final contact = Contact(
+  //       name: _nameController.text,
+  //       company: _companyController.text,
+  //       title: _titleController.text,
+  //       email: _emailController.text,
+  //       notes: _notesController.text,
+  //       metAt: DateTime.now(),
+  //       rawScannedText: widget.rawText,
+  //       // TODO: Get actual location here in next step
+  //       addressLabel: "Scanned Location", 
+  //     );
+
+  //     // This will automatically generate the embedding via our Repo logic!
+  //     await Provider.of<ContactRepository>(context, listen: false).saveContact(contact);
+
+  //     if (mounted) {
+  //       // Go back to Home (pop twice: ScanScreen and ResultScreen)
+  //       Navigator.pop(context); 
+  //     }
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+  //   } finally {
+  //     if (mounted) setState(() => _isSaving = false);
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {

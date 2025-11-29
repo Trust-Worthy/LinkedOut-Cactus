@@ -10,6 +10,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+    sqflite: ^2.3.0
+    uses-material-design: true
+  
+    assets:
+      - assets/cities.csv
+      - assets/geonames.db
 
   # --- YOUR AI SDK ---
   cactus: ^1.2.0
