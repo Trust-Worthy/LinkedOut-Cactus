@@ -19,3 +19,15 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+// Add this block at the very end of the file
+subprojects {
+    if (name == "isar_flutter_libs") {
+        pluginManager.withPlugin("com.android.library") {
+            // Use 'extensions.configure' to access the Android Library configuration
+            extensions.configure<com.android.build.gradle.LibraryExtension> {
+                namespace = "dev.isar.isar_flutter_libs"
+            }
+        }
+    }
+}
