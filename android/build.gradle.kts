@@ -9,25 +9,35 @@ val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build"
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
-}
-subprojects {
+    val project = this
+    project.buildDir = File(newBuildDir.asFile, project.name)
     project.evaluationDependsOn(":app")
-}
 
-tasks.register<Delete>("clean") {
-    delete(rootProject.layout.buildDirectory)
-}
+    // --- FIX 1: Force Compile SDK 35 for all libraries (Fixes lStar error) ---
+    val configureAndroid = {
+        project.extensions.findByType(com.android.build.gradle.BaseExtension::class.java)?.apply {
+            compileSdkVersion(35)
+        }
+    }
 
-// Add this block at the very end of the file
-subprojects {
-    if (name == "isar_flutter_libs") {
-        pluginManager.withPlugin("com.android.library") {
-            // Use 'extensions.configure' to access the Android Library configuration
-            extensions.configure<com.android.build.gradle.LibraryExtension> {
+    if (project.state.executed) {
+        configureAndroid()
+    } else {
+        project.afterEvaluate {
+            configureAndroid()
+        }
+    }
+
+    // --- FIX 2: Isar Namespace Fix ---
+    if (project.name == "isar_flutter_libs") {
+        project.pluginManager.withPlugin("com.android.library") {
+            project.extensions.configure<com.android.build.gradle.LibraryExtension> {
                 namespace = "dev.isar.isar_flutter_libs"
             }
         }
     }
+}
+
+tasks.register<Delete>("clean") {
+    delete(rootProject.layout.buildDirectory)
 }
