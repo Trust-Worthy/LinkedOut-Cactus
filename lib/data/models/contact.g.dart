@@ -22,108 +22,113 @@ const ContactSchema = CollectionSchema(
       name: r'addressLabel',
       type: IsarType.string,
     ),
-    r'company': PropertySchema(
+    r'avatarPath': PropertySchema(
       id: 1,
+      name: r'avatarPath',
+      type: IsarType.string,
+    ),
+    r'company': PropertySchema(
+      id: 2,
       name: r'company',
       type: IsarType.string,
     ),
     r'email': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'email',
       type: IsarType.string,
     ),
     r'embedding': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'embedding',
       type: IsarType.doubleList,
     ),
     r'eventName': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'eventName',
       type: IsarType.string,
     ),
     r'followUpScheduledFor': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'followUpScheduledFor',
       type: IsarType.dateTime,
     ),
     r'instagram': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'instagram',
       type: IsarType.string,
     ),
     r'isEventMode': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isEventMode',
       type: IsarType.bool,
     ),
     r'isFollowUpCompleted': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'isFollowUpCompleted',
       type: IsarType.bool,
     ),
     r'isMe': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'isMe',
       type: IsarType.bool,
     ),
     r'lastInteractedAt': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'lastInteractedAt',
       type: IsarType.dateTime,
     ),
     r'latitude': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'latitude',
       type: IsarType.double,
     ),
     r'linkedin': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'linkedin',
       type: IsarType.string,
     ),
     r'longitude': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'longitude',
       type: IsarType.double,
     ),
     r'metAt': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'metAt',
       type: IsarType.dateTime,
     ),
     r'name': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'name',
       type: IsarType.string,
     ),
     r'notes': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'notes',
       type: IsarType.string,
     ),
     r'phone': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'phone',
       type: IsarType.string,
     ),
     r'rawScannedText': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'rawScannedText',
       type: IsarType.string,
     ),
     r'tags': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'tags',
       type: IsarType.stringList,
     ),
     r'title': PropertySchema(
-      id: 20,
+      id: 21,
       name: r'title',
       type: IsarType.string,
     ),
     r'twitter': PropertySchema(
-      id: 21,
+      id: 22,
       name: r'twitter',
       type: IsarType.string,
     )
@@ -164,6 +169,12 @@ int _contactEstimateSize(
   var bytesCount = offsets.last;
   {
     final value = object.addressLabel;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.avatarPath;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -257,27 +268,28 @@ void _contactSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.addressLabel);
-  writer.writeString(offsets[1], object.company);
-  writer.writeString(offsets[2], object.email);
-  writer.writeDoubleList(offsets[3], object.embedding);
-  writer.writeString(offsets[4], object.eventName);
-  writer.writeDateTime(offsets[5], object.followUpScheduledFor);
-  writer.writeString(offsets[6], object.instagram);
-  writer.writeBool(offsets[7], object.isEventMode);
-  writer.writeBool(offsets[8], object.isFollowUpCompleted);
-  writer.writeBool(offsets[9], object.isMe);
-  writer.writeDateTime(offsets[10], object.lastInteractedAt);
-  writer.writeDouble(offsets[11], object.latitude);
-  writer.writeString(offsets[12], object.linkedin);
-  writer.writeDouble(offsets[13], object.longitude);
-  writer.writeDateTime(offsets[14], object.metAt);
-  writer.writeString(offsets[15], object.name);
-  writer.writeString(offsets[16], object.notes);
-  writer.writeString(offsets[17], object.phone);
-  writer.writeString(offsets[18], object.rawScannedText);
-  writer.writeStringList(offsets[19], object.tags);
-  writer.writeString(offsets[20], object.title);
-  writer.writeString(offsets[21], object.twitter);
+  writer.writeString(offsets[1], object.avatarPath);
+  writer.writeString(offsets[2], object.company);
+  writer.writeString(offsets[3], object.email);
+  writer.writeDoubleList(offsets[4], object.embedding);
+  writer.writeString(offsets[5], object.eventName);
+  writer.writeDateTime(offsets[6], object.followUpScheduledFor);
+  writer.writeString(offsets[7], object.instagram);
+  writer.writeBool(offsets[8], object.isEventMode);
+  writer.writeBool(offsets[9], object.isFollowUpCompleted);
+  writer.writeBool(offsets[10], object.isMe);
+  writer.writeDateTime(offsets[11], object.lastInteractedAt);
+  writer.writeDouble(offsets[12], object.latitude);
+  writer.writeString(offsets[13], object.linkedin);
+  writer.writeDouble(offsets[14], object.longitude);
+  writer.writeDateTime(offsets[15], object.metAt);
+  writer.writeString(offsets[16], object.name);
+  writer.writeString(offsets[17], object.notes);
+  writer.writeString(offsets[18], object.phone);
+  writer.writeString(offsets[19], object.rawScannedText);
+  writer.writeStringList(offsets[20], object.tags);
+  writer.writeString(offsets[21], object.title);
+  writer.writeString(offsets[22], object.twitter);
 }
 
 Contact _contactDeserialize(
@@ -288,29 +300,30 @@ Contact _contactDeserialize(
 ) {
   final object = Contact(
     addressLabel: reader.readStringOrNull(offsets[0]),
-    company: reader.readStringOrNull(offsets[1]),
-    email: reader.readStringOrNull(offsets[2]),
-    embedding: reader.readDoubleList(offsets[3]),
-    eventName: reader.readStringOrNull(offsets[4]),
-    followUpScheduledFor: reader.readDateTimeOrNull(offsets[5]),
-    instagram: reader.readStringOrNull(offsets[6]),
-    isEventMode: reader.readBoolOrNull(offsets[7]) ?? false,
-    isFollowUpCompleted: reader.readBoolOrNull(offsets[8]) ?? false,
-    isMe: reader.readBoolOrNull(offsets[9]) ?? false,
-    latitude: reader.readDoubleOrNull(offsets[11]),
-    linkedin: reader.readStringOrNull(offsets[12]),
-    longitude: reader.readDoubleOrNull(offsets[13]),
-    metAt: reader.readDateTime(offsets[14]),
-    name: reader.readString(offsets[15]),
-    notes: reader.readStringOrNull(offsets[16]),
-    phone: reader.readStringOrNull(offsets[17]),
-    rawScannedText: reader.readStringOrNull(offsets[18]),
-    tags: reader.readStringList(offsets[19]),
-    title: reader.readStringOrNull(offsets[20]),
-    twitter: reader.readStringOrNull(offsets[21]),
+    avatarPath: reader.readStringOrNull(offsets[1]),
+    company: reader.readStringOrNull(offsets[2]),
+    email: reader.readStringOrNull(offsets[3]),
+    embedding: reader.readDoubleList(offsets[4]),
+    eventName: reader.readStringOrNull(offsets[5]),
+    followUpScheduledFor: reader.readDateTimeOrNull(offsets[6]),
+    instagram: reader.readStringOrNull(offsets[7]),
+    isEventMode: reader.readBoolOrNull(offsets[8]) ?? false,
+    isFollowUpCompleted: reader.readBoolOrNull(offsets[9]) ?? false,
+    isMe: reader.readBoolOrNull(offsets[10]) ?? false,
+    latitude: reader.readDoubleOrNull(offsets[12]),
+    linkedin: reader.readStringOrNull(offsets[13]),
+    longitude: reader.readDoubleOrNull(offsets[14]),
+    metAt: reader.readDateTime(offsets[15]),
+    name: reader.readString(offsets[16]),
+    notes: reader.readStringOrNull(offsets[17]),
+    phone: reader.readStringOrNull(offsets[18]),
+    rawScannedText: reader.readStringOrNull(offsets[19]),
+    tags: reader.readStringList(offsets[20]),
+    title: reader.readStringOrNull(offsets[21]),
+    twitter: reader.readStringOrNull(offsets[22]),
   );
   object.id = id;
-  object.lastInteractedAt = reader.readDateTime(offsets[10]);
+  object.lastInteractedAt = reader.readDateTime(offsets[11]);
   return object;
 }
 
@@ -328,42 +341,44 @@ P _contactDeserializeProp<P>(
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
-      return (reader.readDoubleList(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDoubleList(offset)) as P;
     case 5:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 6:
       return (reader.readStringOrNull(offset)) as P;
+    case 6:
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 7:
-      return (reader.readBoolOrNull(offset) ?? false) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 8:
       return (reader.readBoolOrNull(offset) ?? false) as P;
     case 9:
       return (reader.readBoolOrNull(offset) ?? false) as P;
     case 10:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readBoolOrNull(offset) ?? false) as P;
     case 11:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 12:
-      return (reader.readStringOrNull(offset)) as P;
-    case 13:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 14:
       return (reader.readDateTime(offset)) as P;
-    case 15:
-      return (reader.readString(offset)) as P;
-    case 16:
+    case 12:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 13:
       return (reader.readStringOrNull(offset)) as P;
+    case 14:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 15:
+      return (reader.readDateTime(offset)) as P;
+    case 16:
+      return (reader.readString(offset)) as P;
     case 17:
       return (reader.readStringOrNull(offset)) as P;
     case 18:
       return (reader.readStringOrNull(offset)) as P;
     case 19:
-      return (reader.readStringList(offset)) as P;
-    case 20:
       return (reader.readStringOrNull(offset)) as P;
+    case 20:
+      return (reader.readStringList(offset)) as P;
     case 21:
+      return (reader.readStringOrNull(offset)) as P;
+    case 22:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -745,6 +760,152 @@ extension ContactQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'addressLabel',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'avatarPath',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'avatarPath',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'avatarPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'avatarPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'avatarPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'avatarPath',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'avatarPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'avatarPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'avatarPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'avatarPath',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'avatarPath',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> avatarPathIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'avatarPath',
         value: '',
       ));
     });
@@ -3181,6 +3342,18 @@ extension ContactQuerySortBy on QueryBuilder<Contact, Contact, QSortBy> {
     });
   }
 
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByAvatarPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'avatarPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByAvatarPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'avatarPath', Sort.desc);
+    });
+  }
+
   QueryBuilder<Contact, Contact, QAfterSortBy> sortByCompany() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'company', Sort.asc);
@@ -3422,6 +3595,18 @@ extension ContactQuerySortThenBy
   QueryBuilder<Contact, Contact, QAfterSortBy> thenByAddressLabelDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'addressLabel', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByAvatarPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'avatarPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByAvatarPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'avatarPath', Sort.desc);
     });
   }
 
@@ -3676,6 +3861,13 @@ extension ContactQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Contact, Contact, QDistinct> distinctByAvatarPath(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'avatarPath', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Contact, Contact, QDistinct> distinctByCompany(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -3826,6 +4018,12 @@ extension ContactQueryProperty
   QueryBuilder<Contact, String?, QQueryOperations> addressLabelProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'addressLabel');
+    });
+  }
+
+  QueryBuilder<Contact, String?, QQueryOperations> avatarPathProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'avatarPath');
     });
   }
 
