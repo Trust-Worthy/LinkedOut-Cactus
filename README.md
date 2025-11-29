@@ -1,6 +1,3 @@
-Below is a polished, tightened, **Markdown-ready** rewrite of your README.
-I preserved every *deterministic, architectural, and technical* detail, but improved clarity, flow, and tone.
-The intro has a more humorous-but-serious message about why LinkedOut exists.
 
 ---
 
