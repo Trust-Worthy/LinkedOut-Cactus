@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:geolocator/geolocator.dart'; // Import for Position
+import 'package:geolocator/geolocator.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
-import '../../../services/location/location_service.dart'; // Import Location Service
+import '../../../services/location/location_service.dart';
+import '../../../services/location/offline_geocoding_service.dart'; // Import Geocoding Service
 
 class ScanResultScreen extends StatefulWidget {
   final Map<String, String?> initialData;
   final String rawText;
   
-  // Location passed from Scanner
   final double? initialLatitude;
   final double? initialLongitude;
   final String? initialAddress;
@@ -40,7 +40,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   late TextEditingController _linkedinController;
   late TextEditingController _instagramController;
 
-  // Mutable location state (so we can update it if it started null)
   double? _currentLat;
   double? _currentLng;
   bool _isFetchingLocation = false;
@@ -57,7 +56,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     _emailController = TextEditingController(text: widget.initialData['email'] ?? '');
     _notesController = TextEditingController(text: widget.initialData['notes'] ?? '');
     
-    // Initialize location from widget props
     _currentLat = widget.initialLatitude;
     _currentLng = widget.initialLongitude;
     _locationController = TextEditingController(text: widget.initialAddress ?? '');
@@ -66,7 +64,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     _linkedinController = TextEditingController(text: "");
     _instagramController = TextEditingController(text: "");
 
-    // Logic: If we didn't get a location (Manual Add), fetch it now!
     if (_currentLat == null || _currentLng == null) {
       _fetchLocation();
     }
@@ -75,14 +72,11 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   Future<void> _fetchLocation() async {
     setState(() => _isFetchingLocation = true);
     try {
-      // 1. Get GPS
       final position = await LocationService.instance.getCurrentLocation();
       if (position != null) {
         _currentLat = position.latitude;
         _currentLng = position.longitude;
 
-        // 2. Get Address Name (Reverse Geocode)
-        // Only overwrite text if user hasn't typed anything yet
         if (_locationController.text.isEmpty) {
           final address = await LocationService.instance.getAddressLabel(
             position.latitude, 
@@ -106,6 +100,37 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     setState(() => _isSaving = true);
 
     try {
+      // --- NEW: Forward Geocoding Logic ---
+      // If user typed a location manually, we try to verify it against the DB
+      if (_locationController.text.isNotEmpty) {
+        bool isLocationDirty = _locationController.text != widget.initialAddress;
+        
+        // Only lookup if text changed OR we never had coords
+        if (isLocationDirty || _currentLat == null) {
+           final coords = await OfflineGeocodingService.instance.getCoordinates(_locationController.text);
+           
+           if (coords != null) {
+             _currentLat = coords['lat'];
+             _currentLng = coords['lng'];
+             // Optional: Standardize format (e.g. "Denver" -> "Denver, US")
+             // _locationController.text = await OfflineGeocodingService.instance.getCityName(_currentLat!, _currentLng!) ?? _locationController.text;
+           } else {
+             // ERROR: City not found
+             if (mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 SnackBar(
+                   content: Text("⚠️ Offline Location Error: '${_locationController.text}' not found in database. Try a major city name (e.g. 'Denver')."),
+                   backgroundColor: Colors.red,
+                   duration: const Duration(seconds: 4),
+                 ),
+               );
+               setState(() => _isSaving = false);
+               return; // STOP SAVE
+             }
+           }
+        }
+      }
+
       DateTime? followUpDate;
       if (_followUpWeeks > 0) {
         followUpDate = DateTime.now().add(Duration(days: (_followUpWeeks * 7).toInt()));
@@ -125,7 +150,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         metAt: DateTime.now(),
         rawScannedText: widget.rawText,
         
-        // Use our mutable state, NOT the widget props
         latitude: _currentLat,
         longitude: _currentLng,
         addressLabel: _locationController.text, 
@@ -176,20 +200,18 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Core Info
             _buildSectionTitle("Identity"),
             _buildField("Name", _nameController, isRequired: true),
             _buildField("Job Title", _titleController),
             _buildField("Company", _companyController),
             
-            // Location & Context
             const SizedBox(height: 20),
             _buildSectionTitle("Context"),
             Row(
               children: [
                 Expanded(
                   child: _buildField(
-                    "Met At (Location)", 
+                    "Met At (City Name)", 
                     _locationController, 
                     suffixIcon: _isFetchingLocation 
                       ? const SizedBox(
@@ -198,7 +220,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                         )
                       : IconButton(
                           icon: const Icon(Icons.my_location, color: Colors.blue),
-                          onPressed: _fetchLocation, // Allow manual retry
+                          onPressed: _fetchLocation,
                         ),
                   ),
                 ),
@@ -208,14 +230,13 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 16, left: 4),
                 child: Text(
-                  "GPS: $_currentLat, $_currentLng", 
+                  "GPS Locked: ${_currentLat!.toStringAsFixed(4)}, ${_currentLng!.toStringAsFixed(4)}", 
                   style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
                 ),
               ),
 
             _buildField("Event / Conference", _eventController, hint: "e.g. Cactus Hackathon"),
             
-            // Contact Methods
             const SizedBox(height: 20),
             _buildSectionTitle("Contact Info"),
             _buildField("Email", _emailController, keyboardType: TextInputType.emailAddress),
@@ -227,7 +248,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
               ],
             ),
 
-            // Notifications
             const SizedBox(height: 20),
             _buildSectionTitle("Follow Up"),
             Container(
@@ -269,7 +289,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
               ),
             ),
 
-            // Notes
             const SizedBox(height: 20),
             _buildSectionTitle("Notes"),
             _buildField("Thoughts, conversation topics...", _notesController, maxLines: 4),
