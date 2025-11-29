@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:provider/provider.dart';
 import '../../../services/ai/cactus_service.dart';
 import '../../../services/location/location_service.dart';
-import '../../../core/utils/business_card_extractor.dart'; // Import the new extractor
+import '../../../core/utils/business_card_extractor.dart'; 
 import 'scan_result_screen.dart';
 
 class ScanScreen extends StatefulWidget {
@@ -16,13 +16,14 @@ class ScanScreen extends StatefulWidget {
 
 class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateMixin {
   CameraController? cameraController;
-  List<CameraDescription>? cameras;
   bool isScanning = false;
   bool flashOn = false;
-  bool showTipsSheet = true;
-  
+  bool showTipsSheet = true; // Flag to control tips display
   late AnimationController _animationController;
-  final TextRecognizer textRecognizer = TextRecognizer(); // Google ML Kit
+  final TextRecognizer textRecognizer = TextRecognizer(); 
+
+  // Live status notifier for the loading dialog
+  final ValueNotifier<String> _loadingStatus = ValueNotifier("Initializing...");
 
   @override
   void initState() {
@@ -31,23 +32,22 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    
     _initializeCamera();
   }
 
   Future<void> _initializeCamera() async {
     try {
-      cameras = await availableCameras();
-      if (cameras != null && cameras!.isNotEmpty) {
+      final cameras = await availableCameras();
+      if (cameras.isNotEmpty) {
         cameraController = CameraController(
-          cameras![0],
+          cameras[0],
           ResolutionPreset.high,
           enableAudio: false,
         );
         await cameraController!.initialize();
         if (mounted) {
           setState(() {});
-          // Show tips after a short delay
+          // Show tips after a short delay so the camera view is visible first
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted && showTipsSheet) {
               _showTipsBottomSheet();
@@ -65,209 +65,85 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     cameraController?.dispose();
     textRecognizer.close();
     _animationController.dispose();
+    _loadingStatus.dispose();
     super.dispose();
   }
 
-  Future<void> _captureAndProcessText() async {
-    if (cameraController == null || !cameraController!.value.isInitialized || isScanning) {
-      return;
+  void _toggleFlash() {
+    if (cameraController != null) {
+      flashOn = !flashOn;
+      cameraController!.setFlashMode(flashOn ? FlashMode.torch : FlashMode.off);
+      setState(() {});
     }
+  }
+
+  Future<void> _captureAndProcessText() async {
+    if (cameraController == null || !cameraController!.value.isInitialized || isScanning) return;
 
     setState(() => isScanning = true);
 
     try {
-      // 1. Capture Image
       final XFile image = await cameraController!.takePicture();
       final InputImage inputImage = InputImage.fromFilePath(image.path);
-      
-      // 2. Google ML Kit Extraction (Fast & Accurate)
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
       
       if (recognizedText.text.isNotEmpty) {
-        // Show friend's UI for raw text review
-        if (mounted) _showTextBottomSheet(recognizedText.text);
+        if (mounted) _handleAIOrganization(recognizedText.text);
       } else {
-        _showErrorSnackBar('No text detected. Please try again.');
+        _showErrorSnackBar('No text detected.');
       }
     } catch (e) {
-      _showErrorSnackBar('Error processing image: $e');
+      _showErrorSnackBar('Error: $e');
     } finally {
       if (mounted) setState(() => isScanning = false);
     }
   }
 
-  // --- UI: RAW TEXT REVIEW ---
-  void _showTextBottomSheet(String rawText) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(25),
-            topRight: Radius.circular(25),
-          ),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.text_fields, color: Colors.blue[700], size: 28),
-                  ),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Extracted Text', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        Text('Review before AI processing', style: TextStyle(fontSize: 14, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            
-            const Divider(height: 1),
-            
-            // Extracted text content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: SelectableText(
-                    rawText,
-                    style: const TextStyle(fontSize: 16, height: 1.6, color: Colors.black87),
-                  ),
-                ),
-              ),
-            ),
-            
-            // Action buttons
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // AI Organization button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _handleAIOrganization(rawText), // Trigger our Logic
-                      icon: const Icon(Icons.auto_awesome, size: 22),
-                      label: const Text(
-                        'Organize with AI',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1F6DB4),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- LOGIC: BRIDGE TO YOUR ARCHITECTURE ---
+  // --- LOGIC: Regex + AI + GPS (With Status Updates) ---
   Future<void> _handleAIOrganization(String rawText) async {
-    // 1. Close the BottomSheet
-    Navigator.pop(context);
-
-    // 2. Show Loading
     _showLoadingDialog();
 
     try {
-      // 3. STEP A: Run Regex Extraction (Instant)
-      // This happens locally and synchronously before AI potentially takes time
+      // 1. Regex (Instant)
+      _loadingStatus.value = "Pattern Matching...";
       final regexData = BusinessCardExtractor.extract(rawText);
 
-      // 4. STEP B: Parallel Execution (AI Parsing + GPS Location)
-      // We start these now.
-      final aiFuture = CactusService.instance.parseCardText(rawText);
-      final locFuture = LocationService.instance.getCurrentLocation();
+      // 2. GPS (With Timeout)
+      _loadingStatus.value = "Acquiring GPS...";
+      dynamic position;
+      try {
+        // Give GPS 2.5 seconds max, otherwise proceed without it
+        position = await LocationService.instance.getCurrentLocation()
+            .timeout(const Duration(milliseconds: 2500), onTimeout: () => null);
+      } catch (e) {
+        debugPrint("GPS Timeout/Error: $e");
+      }
 
-      final results = await Future.wait([aiFuture, locFuture]);
-      
-      final aiData = results[0] as Map<String, String?>;
-      final position = results[1] as dynamic; // Cast later
+      // 3. AI Parsing (Heavy Lift)
+      _loadingStatus.value = "Waking up AI Brain...";
+      final aiData = await CactusService.instance.parseCardText(rawText);
 
-      // 5. Merge Data Strategy
-      // - Regex is better for strict formats (Email, Phone, Links)
-      // - AI is better for fuzzy context (Name, Company, Title)
+      _loadingStatus.value = "Merging Data...";
+
+      // 4. Merge Data
       final mergedData = {
         'name': aiData['name'] ?? regexData.name,
         'company': aiData['company'] ?? regexData.company,
         'title': aiData['title'] ?? regexData.title,
-        
-        // Prioritize Regex for these, fallback to AI
         'email': regexData.email ?? aiData['email'],
         'phone': regexData.phone ?? aiData['phone'],
         'linkedin': regexData.linkedin ?? aiData['linkedin'],
-        
-        // Combine notes
-        'notes': (aiData['notes'] ?? "") + "\n\nRaw Scan:\n" + rawText,
+        'notes': (aiData['notes'] ?? "") + "\n\nRaw Scan:\n" + rawText, 
       };
 
-      // 6. Resolve Address (Offline)
-      String? address = regexData.address; // Try regex address first
+      // 5. Resolve Address (Offline)
+      String? address = regexData.address;
       double? lat, lng;
       
       if (position != null) {
         lat = position.latitude;
         lng = position.longitude;
-        // If we have GPS, prioritize the GPS-derived address over the Regex text address
+        // Lookup offline city name
         final gpsAddress = await LocationService.instance.getAddressLabel(lat!, lng!);
         if (gpsAddress != null) {
           address = gpsAddress;
@@ -277,7 +153,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
 
-      // 7. Navigate to Save Form (ScanResultScreen)
+      // 6. Navigate to Save Form
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -294,26 +170,42 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Close loading
-        _showErrorSnackBar("AI Error: $e");
+        _showErrorSnackBar("Processing Failed: $e");
       }
     }
   }
 
+  // --- UPDATED LOADING DIALOG (Live Status) ---
   void _showLoadingDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const Center(
+      builder: (ctx) => Center(
         child: Card(
+          margin: const EdgeInsets.symmetric(horizontal: 40),
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(color: Color(0xFF1F6DB4)),
-                SizedBox(height: 16),
-                Text("Analyzing card..."),
-                Text("Regex + AI + GPS running...", style: TextStyle(fontSize: 10, color: Colors.grey)),
+                const CircularProgressIndicator(color: Color(0xFF1F6DB4)),
+                const SizedBox(height: 20),
+                const Text(
+                  "Processing",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                // Live status update widget
+                ValueListenableBuilder<String>(
+                  valueListenable: _loadingStatus,
+                  builder: (context, value, child) {
+                    return Text(
+                      value,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -322,7 +214,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- UI HELPERS (Friend's Code) ---
+  // --- UI HELPERS ---
 
   void _showTipsBottomSheet() {
     showModalBottomSheet(
@@ -389,14 +281,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _toggleFlash() {
-    if (cameraController != null) {
-      flashOn = !flashOn;
-      cameraController!.setFlashMode(flashOn ? FlashMode.torch : FlashMode.off);
-      setState(() {});
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (cameraController == null || !cameraController!.value.isInitialized) {
@@ -413,7 +297,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           // Camera Preview
           Positioned.fill(child: CameraPreview(cameraController!)),
           
-          // Overlay
+          // Custom Overlay (Friend's Style)
           CustomPaint(
             painter: ScannerOverlay(
               scanWindow: Rect.fromCenter(
@@ -447,6 +331,36 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               ),
             ),
           ),
+
+          // Scanning animation line
+          if (!isScanning)
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.28,
+              left: MediaQuery.of(context).size.width * 0.075,
+              right: MediaQuery.of(context).size.width * 0.075,
+              child: AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(
+                      0,
+                      _animationController.value * MediaQuery.of(context).size.width * 0.55,
+                    ),
+                    child: Container(
+                      height: 3,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Colors.transparent, Colors.white, Colors.transparent],
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: Colors.white.withOpacity(0.8), blurRadius: 10, spreadRadius: 2),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
 
           // Bottom Bar
           Positioned(

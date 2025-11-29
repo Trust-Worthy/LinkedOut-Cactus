@@ -7,6 +7,7 @@ import 'services/location/offline_geocoding_service.dart';
 import 'services/search/vector_search_service.dart';
 import 'services/ai/cactus_service.dart';
 import 'services/search/smart_search_service.dart'; // ADD THIS IMPORT
+import 'services/search/advanced_search_service.dart'; // ADD THIS
 // Data & App
 import 'app.dart';
 import 'data/local/database/isar_service.dart';
@@ -31,25 +32,16 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        Provider<ContactRepository>(
-          create: (_) => ContactRepository(isarService),
-        ),
+        Provider<ContactRepository>(create: (_) => ContactRepository(isarService)),
         
-        // Add the Smart Search Service
-        Provider<SmartSearchService>(
-          create: (context) => SmartSearchService(
+        // REPLACING SmartSearchService with AdvancedSearchService
+        Provider<AdvancedSearchService>(
+          create: (context) => AdvancedSearchService(
             context.read<ContactRepository>(),
             CactusService.instance,
           ),
         ),
-        
-        // Keep Vector Search if needed elsewhere, or remove if fully replaced
-        Provider<VectorSearchService>(
-          create: (context) => VectorSearchService(
-            context.read<ContactRepository>(),
-            CactusService.instance,
-          ),
-        ),
+        // ... other providers ...
       ],
       child: LinkedOutApp(startOnboarding: !hasOnboarded),
     ),

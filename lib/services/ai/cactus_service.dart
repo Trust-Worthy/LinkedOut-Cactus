@@ -8,11 +8,7 @@ import 'package:logger/logger.dart';
 class CactusService {
   final Logger _logger = Logger();
   
-  // --- DUAL ENGINE ARCHITECTURE ---
-  // Engine 1: The "Eyes" (Vision / OCR)
   final CactusLM _visionLM = CactusLM();
-  
-  // Engine 2: The "Brain" (Embeddings / Chat / Parsing)
   final CactusLM _textLM = CactusLM();
   
   static final CactusService _instance = CactusService._internal();
@@ -20,18 +16,15 @@ class CactusService {
   CactusService._internal();
   static CactusService get instance => _instance;
 
-  // Track initialization separately
-  bool _isTextReady = false;
-  bool _isVisionReady = false;
-  
+  bool isInitialized = false;
   String? visionSlug;
   String? textSlug;
 
   bool isModelReady() {
-    return _isTextReady && _textLM.isLoaded();
+    return _visionLM.isLoaded() && _textLM.isLoaded();
   }
 
-  // --- 1. Intelligent Model Selection & Download ---
+  // --- 1. Model Management ---
 
   Future<void> downloadModel({
     required Function(double progress, String status) onProgress,
@@ -42,7 +35,6 @@ class CactusService {
       
       final models = await _visionLM.getModels(); 
       
-      // Select Models
       final visionModel = models.firstWhere(
         (m) => m.slug.contains('lfm') && m.supportsVision,
         orElse: () => models.firstWhere((m) => m.supportsVision),
@@ -58,7 +50,6 @@ class CactusService {
       _logger.i("👁️ Vision Model: $visionSlug");
       _logger.i("🧠 Text Model:   $textSlug");
 
-      // Download Text Model (Brain)
       if (!textModel.isDownloaded) {
         await _textLM.downloadModel(
           model: textSlug!,
@@ -66,7 +57,6 @@ class CactusService {
         );
       }
 
-      // Download Vision Model (Eyes)
       if (!visionModel.isDownloaded) {
         await _visionLM.downloadModel(
           model: visionSlug!,
@@ -75,9 +65,7 @@ class CactusService {
       }
 
       onProgress(1.0, "Initializing AI Systems...");
-      // We perform a light init here to ensure configs are ready, 
-      // but we might not load weights into RAM until needed.
-      await _ensureModelSelection();
+      await initialize();
       
     } catch (e) {
       _logger.e("Download Exception: $e");
@@ -95,64 +83,37 @@ class CactusService {
     }
   }
 
-  /// Helper to ensure we know WHICH models to use, even after app restart
-  Future<void> _ensureModelSelection() async {
-    if (visionSlug != null && textSlug != null) return;
+  Future<void> initialize() async {
+    if (isInitialized) return;
+    try {
+      if (visionSlug == null || textSlug == null) {
+        final models = await _visionLM.getModels();
+        visionSlug = models.firstWhere((m) => m.supportsVision, orElse: () => models.first).slug;
+        textSlug = models.firstWhere((m) => !m.supportsVision && m.slug != visionSlug, orElse: () => models.last).slug;
+      }
 
-    _logger.i("Restoring model selection...");
-    final models = await _visionLM.getModels();
-    
-    visionSlug = models.firstWhere(
-      (m) => m.slug.contains('lfm') && m.supportsVision,
-      orElse: () => models.firstWhere((m) => m.supportsVision),
-    ).slug;
-
-    textSlug = models.firstWhere(
-      (m) => (m.slug.contains('qwen') || m.slug.contains('gemma')) && !m.supportsVision,
-      orElse: () => models.firstWhere((m) => !m.supportsVision && m.slug != visionSlug),
-    ).slug;
+      await _textLM.initializeModel(params: CactusInitParams(model: textSlug!));
+      await _visionLM.initializeModel(params: CactusInitParams(model: visionSlug!));
+      isInitialized = true;
+    } catch (e) {
+      rethrow;
+    }
   }
 
-  // --- LAZY LOADERS ---
-
-  Future<void> _initTextEngine() async {
-    if (_isTextReady && _textLM.isLoaded()) return;
-    await _ensureModelSelection();
-    
-    _logger.i("🧠 Booting Text Engine ($textSlug)...");
-    await _textLM.initializeModel(params: CactusInitParams(model: textSlug!));
-    _isTextReady = true;
-  }
-
-  Future<void> _initVisionEngine() async {
-    if (_isVisionReady && _visionLM.isLoaded()) return;
-    await _ensureModelSelection();
-
-    _logger.i("👁️ Booting Vision Engine ($visionSlug)...");
-    await _visionLM.initializeModel(params: CactusInitParams(model: visionSlug!));
-    _isVisionReady = true;
-  }
-
-  // --- 2. Vision Tasks (Use Vision LM) ---
-
+  // --- 2. Vision Tasks ---
   Future<String> scanBusinessCard(String imagePath) async {
-    await _initVisionEngine(); // Only load Vision if strictly needed
-    _logger.i("Running OCR with $visionSlug...");
+    if (!isInitialized) await initialize();
     
     final result = await _visionLM.generateCompletion(
-      messages: [
-        ChatMessage(role: "user", content: "Read this card.", images: [imagePath])
-      ],
+      messages: [ChatMessage(role: "user", content: "Read this card.", images: [imagePath])],
       params: CactusCompletionParams(maxTokens: 500),
     );
     return result.success ? result.response : throw Exception("Vision failed");
   }
 
-  // --- 3. Text Tasks (Use Text LM) ---
-
+  // --- 3. Parsing ---
   Future<Map<String, String?>> parseCardText(String rawText) async {
-    await _initTextEngine(); // Only load Text model (Fast!)
-    _logger.i("Parsing text with $textSlug...");
+    if (!isInitialized) await initialize();
 
     const prompt = """
     Extract JSON from this business card text. 
@@ -169,45 +130,34 @@ class CactusService {
     return result.success ? _parseJsonFromResponse(result.response) : throw Exception("Parsing failed");
   }
 
-  // --- 4. Embeddings (Use Text LM - CRITICAL FOR RAG) ---
-
+  // --- 4. Embeddings ---
   Future<List<double>> getEmbedding(String text) async {
-    await _initTextEngine(); // Only load Text model
-
+    if (!isInitialized) await initialize();
     try {
       final result = await _textLM.generateEmbedding(text: text);
       if (result.success) return result.embeddings;
       throw Exception("Embedding failed");
     } catch (e) {
-      _logger.e("Embedding Error: $e");
       return [];
     }
   }
 
-  // --- 5. RAG Chat (Use Text LM) ---
-
+  // --- 5. RAG Chat ---
   Future<String> generateChatResponse(List<ChatMessage> messages) async {
-    await _initTextEngine();
-    _logger.i("Thinking with $textSlug...");
-
+    if (!isInitialized) await initialize();
     final result = await _textLM.generateCompletion(
       messages: messages,
       params: CactusCompletionParams(maxTokens: 500, temperature: 0.7),
     );
-
     return result.success ? result.response : "I lost my train of thought.";
   }
 
-  // --- 6. Chat Streaming (Use Text LM) ---
-  
   Stream<String> streamChat(List<ChatMessage> history) async* {
-    await _initTextEngine();
-
+    if (!isInitialized) await initialize();
     final result = await _textLM.generateCompletionStream(
       messages: history,
       params: CactusCompletionParams(maxTokens: 500),
     );
-
     await for (final chunk in result.stream) {
       yield chunk;
     }
@@ -216,10 +166,15 @@ class CactusService {
   // --- Helpers ---
   Map<String, String?> _parseJsonFromResponse(String llmOutput) {
     try {
-      String cleaned = llmOutput.trim()
+      // 1. Remove <think> tags (Reasoning models)
+      String cleaned = llmOutput.replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '');
+      
+      // 2. Remove Markdown
+      cleaned = cleaned.trim()
           .replaceAll(RegExp(r'```json\s*'), '')
           .replaceAll(RegExp(r'```\s*'), '');
       
+      // 3. Find JSON boundaries
       final firstBrace = cleaned.indexOf('{');
       final lastBrace = cleaned.lastIndexOf('}');
       if (firstBrace >= 0 && lastBrace > firstBrace) {
@@ -234,15 +189,15 @@ class CactusService {
         'phone': parsed['phone']?.toString(),
         'title': parsed['title']?.toString(),
         'linkedin': parsed['linkedin']?.toString(),
-        'notes': parsed['notes']?.toString(),
+        // Only map notes if they aren't just "Here is the JSON"
+        'notes': parsed['notes']?.toString(), 
       };
     } catch (e) {
-      return {'name': null, 'notes': "Raw: $llmOutput"};
+      // Return empty map on failure so Regex fallback can take over entirely
+      return {};
     }
   }
   
-  int min(int a, int b) => a < b ? a : b;
-
   void dispose() {
     _visionLM.unload();
     _textLM.unload();
