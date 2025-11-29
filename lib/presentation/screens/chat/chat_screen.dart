@@ -36,7 +36,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      // Use the new Smart Search Service
+      // Use the Smart Search Service (Router Agent)
       final searchService = Provider.of<SmartSearchService>(context, listen: false);
       final results = await searchService.search(text);
 
@@ -66,91 +66,129 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Chat History
-        Expanded(
-          child: _messages.isEmpty 
-            ? _buildEmptyState()
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  return _buildMessageItem(_messages[index]);
-                },
-              ),
+    return Scaffold(
+      backgroundColor: Colors.black, // Friend's Dark Background
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        title: const Text(
+          'AI Assistant',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        
-        // Input Area
-        if (_isThinking) 
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-                SizedBox(width: 8),
-                Text("Analyzing network...", style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          // Chat History
+          Expanded(
+            child: _messages.isEmpty 
+              ? _buildEmptyState()
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    return _buildMessageItem(_messages[index]);
+                  },
+                ),
+          ),
+          
+          // Thinking Indicator
+          if (_isThinking) 
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue)),
+                  const SizedBox(width: 12),
+                  Text("Analyzing network...", style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+                ],
+              ),
+            ),
+
+          // Input Area (Friend's Design)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[900],
+              border: Border(
+                top: BorderSide(color: Colors.grey[800]!, width: 0.5),
+              ),
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: TextField(
+                        controller: _controller,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'Ask about your contacts...',
+                          hintStyle: TextStyle(color: Colors.grey[600]),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                        maxLines: null,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_upward, color: Colors.white),
+                      onPressed: _isThinking ? null : _sendMessage,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Colors.grey.shade200)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  decoration: InputDecoration(
-                    hintText: "Ask about your network...",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  ),
-                  onSubmitted: (_) => _sendMessage(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _isThinking ? null : _sendMessage,
-                icon: const Icon(Icons.send_rounded),
-                color: Colors.black,
-              )
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildMessageItem(ChatItem item) {
     if (item.isUser) {
-      // User Message (Right Bubble)
+      // User Message (Right Bubble - Blue)
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.75,
+          ),
           decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(16).copyWith(bottomRight: Radius.zero),
+            color: Colors.blue,
+            borderRadius: BorderRadius.circular(20).copyWith(bottomRight: const Radius.circular(4)),
           ),
           child: Text(
             item.text ?? "",
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.white, fontSize: 15),
           ),
         ),
       );
     } else {
-      // AI Message (Left Bubble + Cards)
+      // AI Message (Left Bubble - Grey + Cards)
       return Align(
         alignment: Alignment.centerLeft,
         child: Container(
@@ -162,26 +200,29 @@ class _ChatScreenState extends State<ChatScreen> {
               // AI Text Response
               if (item.text != null)
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(16).copyWith(bottomLeft: Radius.zero),
+                    color: Colors.grey[900], // Friend's Dark Grey
+                    borderRadius: BorderRadius.circular(20).copyWith(bottomLeft: const Radius.circular(4)),
                   ),
-                  child: Text(item.text!, style: const TextStyle(color: Colors.black87)),
+                  child: Text(item.text!, style: const TextStyle(color: Colors.white, fontSize: 15)),
                 ),
               
               // Result Cards
               if (item.contacts != null && item.contacts!.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
+                  padding: const EdgeInsets.only(top: 12.0),
                   child: Column(
                     children: item.contacts!.map((c) => 
-                      ContactCard(
-                        contact: c, 
-                        onTap: () {
-                          // TODO: Navigate to detail
-                          debugPrint("Tapped ${c.name}");
-                        },
+                      // We wrap the ContactCard to fit the dark theme context better
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: ContactCard(
+                          contact: c, 
+                          onTap: () {
+                            // TODO: Navigate to detail
+                          },
+                        ),
                       )
                     ).toList(),
                   ),
@@ -198,12 +239,37 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_awesome, size: 48, color: Colors.grey.shade300),
+          Icon(
+            Icons.auto_awesome,
+            size: 80,
+            color: Colors.grey[700],
+          ),
           const SizedBox(height: 16),
-          const Text("Chat with your Network", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
+          Text(
+            'Ask me about your contacts',
+            style: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'I can help you search, filter, and manage your professional connections',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          // Suggestion Chips (Styled for Dark Mode)
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
               _suggestionChip("Who did I meet in Denver?"),
@@ -218,9 +284,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _suggestionChip(String label) {
     return ActionChip(
-      label: Text(label),
-      backgroundColor: Colors.white,
-      side: BorderSide(color: Colors.grey.shade200),
+      label: Text(label, style: const TextStyle(color: Colors.white)),
+      backgroundColor: Colors.grey[900],
+      side: BorderSide(color: Colors.grey[800]!),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       onPressed: () {
         _controller.text = label;
         _sendMessage();
