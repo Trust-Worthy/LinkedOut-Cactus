@@ -14,11 +14,9 @@ class OfflineGeocodingService {
   Future<void> initialize() async {
     if (_db != null) return;
 
-    // 1. Get location on device
     var databasesPath = await getDatabasesPath();
     var path = join(databasesPath, "geonames.db");
 
-    // 2. Check if DB exists
     var exists = await databaseExists(path);
 
     if (!exists) {
@@ -27,26 +25,17 @@ class OfflineGeocodingService {
         await Directory(dirname(path)).create(recursive: true);
       } catch (_) {}
 
-      // 3. Copy from Asset
       ByteData data = await rootBundle.load(join("assets", "geonames.db"));
       List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       await File(path).writeAsBytes(bytes, flush: true);
-    } else {
-      print("Opening existing geonames.db");
     }
 
-    // 4. Open
     _db = await openDatabase(path, readOnly: true);
   }
 
-  /// Find nearest city using SQL math
-  /// Note: SQLite doesn't have SQRT/COS built-in by default in all versions, 
-  /// so we select a "box" of candidates and refine in Dart.
   Future<String?> getCityName(double lat, double lng) async {
     if (_db == null) await initialize();
 
-    // 1. Optimization: Only fetch cities within ~0.5 degrees (approx 50km)
-    // This makes the query instant.
     double range = 0.5;
 
     final List<Map<String, dynamic>> maps = await _db!.query(
@@ -57,7 +46,6 @@ class OfflineGeocodingService {
 
     if (maps.isEmpty) return null;
 
-    // 2. Find exact nearest in Dart
     Map<String, dynamic>? nearest;
     double minDistance = double.infinity;
 
@@ -65,7 +53,6 @@ class OfflineGeocodingService {
       double cLat = city['lat'];
       double cLng = city['lng'];
       
-      // Simple Euclidean distance for speed (sufficient for finding nearest city)
       double dist = (lat - cLat) * (lat - cLat) + (lng - cLng) * (lng - cLng);
       
       if (dist < minDistance) {
@@ -76,6 +63,32 @@ class OfflineGeocodingService {
 
     if (nearest != null) {
       return "${nearest['name']}, ${nearest['country']}";
+    }
+    return null;
+  }
+
+  // --- NEW: Forward Geocoding (Name -> Lat/Lng) ---
+  Future<Map<String, double>?> getCoordinates(String query) async {
+    if (_db == null) await initialize();
+
+    // Clean query (remove country code if user typed "Denver, US")
+    String cityName = query.split(',')[0].trim();
+
+    // Search for city name (Case insensitive search)
+    // We use LIKE to match "Denver" in "Denver"
+    final List<Map<String, dynamic>> results = await _db!.query(
+      'cities',
+      columns: ['lat', 'lng', 'name', 'country'],
+      where: 'name LIKE ? COLLATE NOCASE',
+      whereArgs: [cityName], 
+      limit: 1,
+    );
+
+    if (results.isNotEmpty) {
+      return {
+        'lat': results.first['lat'] as double,
+        'lng': results.first['lng'] as double,
+      };
     }
     return null;
   }
