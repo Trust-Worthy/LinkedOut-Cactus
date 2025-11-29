@@ -7,8 +7,7 @@ import 'package:logger/logger.dart';
 class CactusService {
   final Logger _logger = Logger();
   
-  // We use two separate instances if we want to hold different models, 
-  // but for the Hackathon, swapping one model is safer for memory.
+  // We use a single instance for memory efficiency during the hackathon
   final CactusLM _lm = CactusLM();
   
   // Singleton Pattern
@@ -124,6 +123,7 @@ class CactusService {
 
   /// Takes an image path, returns the raw text description/extraction
   Future<String> scanBusinessCard(String imagePath) async {
+    // Auto-wake if not initialized
     if (!isInitialized) await initialize();
 
     _logger.i("Scanning business card: $imagePath");
@@ -159,6 +159,9 @@ class CactusService {
 
   /// Takes raw text, returns a Map of structured data
   Future<Map<String, String?>> parseCardText(String rawText) async {
+    // Auto-wake if not initialized
+    if (!isInitialized) await initialize();
+
     _logger.i("Parsing extracted text...");
     
     const prompt = """
@@ -186,12 +189,18 @@ class CactusService {
   // --- 4. Embeddings (Vector Search) ---
 
   Future<List<double>> getEmbedding(String text) async {
+    // Auto-wake if not initialized (Crucial for manual adds)
+    if (!isInitialized) await initialize();
+
     try {
+      _logger.i("Generating embedding for: ${text.substring(0, min(text.length, 20))}...");
       final result = await _lm.generateEmbedding(text: text);
+      
       if (result.success) {
+        _logger.i("Generated embedding with ${result.embeddings.length} dimensions");
         return result.embeddings;
       }
-      throw Exception("Embedding failed");
+      throw Exception("Embedding failed (Success=false)");
     } catch (e) {
       _logger.e("Embedding Error: $e");
       return [];
@@ -257,6 +266,8 @@ class CactusService {
       };
     }
   }
+  
+  int min(int a, int b) => a < b ? a : b;
 
   void dispose() {
     _lm.unload();
