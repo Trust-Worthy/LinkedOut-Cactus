@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../services/ai/cactus_service.dart';
-import '../../home/home_screen.dart';
+import '../../../services/ai/cactus_service.dart';
+// FIX: Correct relative import path
+import '../home/home_screen.dart'; 
 
 class GetStartedScreen extends StatefulWidget {
   const GetStartedScreen({super.key});
