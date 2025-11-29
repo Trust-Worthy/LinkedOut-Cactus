@@ -1,6 +1,8 @@
+<div align="center">
+  <img src="assets/3.png" width="300" />
+</div>
 
 ---
-
 # **LinkedOut — Privacy-First AI Networking (Without the Corporate Surveillance Tax)**
 
 We built **LinkedOut** because modern networking platforms went… well… off the rails.
@@ -165,6 +167,9 @@ lib/
 ```
 
 ---
+<p align="center">
+  <img src="assets/Screenshot 2025-11-29 at 09.09.55.png" width="300" />
+</p>
 
 # 🔄 **User Flow**
 
