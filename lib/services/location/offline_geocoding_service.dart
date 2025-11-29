@@ -1,83 +1,82 @@
-import 'dart:math';
-import 'package:flutter/services.dart' show rootBundle;
-
-class City {
-  final String name;
-  final String country;
-  final double lat;
-  final double lng;
-
-  City({required this.name, required this.country, required this.lat, required this.lng});
-}
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 class OfflineGeocodingService {
-  // Singleton
   static final OfflineGeocodingService _instance = OfflineGeocodingService._internal();
   factory OfflineGeocodingService() => _instance;
   OfflineGeocodingService._internal();
   static OfflineGeocodingService get instance => _instance;
 
-  List<City> _cities = [];
-  bool _isLoaded = false;
+  Database? _db;
 
-  /// Load the CSV into memory (Call this in main.dart)
   Future<void> initialize() async {
-    if (_isLoaded) return;
-    
-    try {
-      final data = await rootBundle.loadString('assets/cities.csv');
-      final lines = data.split('\n');
-      
-      // Skip header row
-      for (var i = 1; i < lines.length; i++) {
-        final line = lines[i].trim();
-        if (line.isEmpty) continue;
-        
-        final parts = line.split(',');
-        if (parts.length >= 4) {
-          _cities.add(City(
-            name: parts[0],
-            country: parts[1],
-            lat: double.parse(parts[2]),
-            lng: double.parse(parts[3]),
-          ));
-        }
-      }
-      _isLoaded = true;
-      print("Offline Geocoding: Loaded ${_cities.length} cities.");
-    } catch (e) {
-      print("Error loading cities CSV: $e");
+    if (_db != null) return;
+
+    // 1. Get location on device
+    var databasesPath = await getDatabasesPath();
+    var path = join(databasesPath, "geonames.db");
+
+    // 2. Check if DB exists
+    var exists = await databaseExists(path);
+
+    if (!exists) {
+      print("Creating new copy of geonames.db from asset");
+      try {
+        await Directory(dirname(path)).create(recursive: true);
+      } catch (_) {}
+
+      // 3. Copy from Asset
+      ByteData data = await rootBundle.load(join("assets", "geonames.db"));
+      List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await File(path).writeAsBytes(bytes, flush: true);
+    } else {
+      print("Opening existing geonames.db");
     }
+
+    // 4. Open
+    _db = await openDatabase(path, readOnly: true);
   }
 
-  /// Find the nearest city to the given coordinates
-  String? getCityName(double lat, double lng) {
-    if (_cities.isEmpty) return null;
+  /// Find nearest city using SQL math
+  /// Note: SQLite doesn't have SQRT/COS built-in by default in all versions, 
+  /// so we select a "box" of candidates and refine in Dart.
+  Future<String?> getCityName(double lat, double lng) async {
+    if (_db == null) await initialize();
 
-    City? nearestCity;
+    // 1. Optimization: Only fetch cities within ~0.5 degrees (approx 50km)
+    // This makes the query instant.
+    double range = 0.5;
+
+    final List<Map<String, dynamic>> maps = await _db!.query(
+      'cities',
+      where: 'lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?',
+      whereArgs: [lat - range, lat + range, lng - range, lng + range],
+    );
+
+    if (maps.isEmpty) return null;
+
+    // 2. Find exact nearest in Dart
+    Map<String, dynamic>? nearest;
     double minDistance = double.infinity;
 
-    for (final city in _cities) {
-      final dist = _calculateDistance(lat, lng, city.lat, city.lng);
+    for (var city in maps) {
+      double cLat = city['lat'];
+      double cLng = city['lng'];
+      
+      // Simple Euclidean distance for speed (sufficient for finding nearest city)
+      double dist = (lat - cLat) * (lat - cLat) + (lng - cLng) * (lng - cLng);
+      
       if (dist < minDistance) {
         minDistance = dist;
-        nearestCity = city;
+        nearest = city;
       }
     }
 
-    if (nearestCity != null) {
-      // If nearest city is > 50km away, maybe just return generic country or "Unknown"
-      // But for hackathon, let's just return the nearest match.
-      return "${nearestCity.name}, ${nearestCity.country}";
+    if (nearest != null) {
+      return "${nearest['name']}, ${nearest['country']}";
     }
     return null;
-  }
-
-  // Haversine formula for distance
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const p = 0.017453292519943295; // Math.PI / 180
-    final a = 0.5 - cos((lat2 - lat1) * p) / 2 +
-        cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
-    return 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
   }
 }
