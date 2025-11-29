@@ -1,3 +1,4 @@
+import 'package:cactus/cactus.dart';
 import '../../data/models/contact.dart';
 import '../../data/repositories/contact_repository.dart';
 import '../../core/utils/vector_utils.dart';
@@ -9,52 +10,60 @@ class VectorSearchService {
 
   VectorSearchService(this._repository, this._aiService);
 
-  /// 1. SEMANTIC SEARCH
-  /// Returns contacts ranked by relevance to the query.
+  /// 1. SEMANTIC SEARCH (Retrieval)
   Future<List<Contact>> search(String query, {int limit = 5}) async {
-    // A. Get all contacts 
     final allContacts = await _repository.getAllContacts();
     
-    // B. Generate embedding for the USER'S QUERY
+    // 1. Embed the User's Query
     final queryEmbedding = await _aiService.getEmbedding(query);
-    
     if (queryEmbedding.isEmpty) return [];
 
-    // C. Score every contact
-    // We create a list of (Contact, Score) pairs
+    // 2. Score Matches (Cosine Similarity)
     List<MapEntry<Contact, double>> scoredContacts = [];
-
     for (var contact in allContacts) {
       if (contact.embedding != null) {
         final score = VectorUtils.cosineSimilarity(queryEmbedding, contact.embedding!);
-        scoredContacts.add(MapEntry(contact, score));
+        // Only keep somewhat relevant results
+        if (score > 0.3) { 
+          scoredContacts.add(MapEntry(contact, score));
+        }
       }
     }
 
-    // D. Sort by score (Highest first)
+    // 3. Sort & Filter
     scoredContacts.sort((a, b) => b.value.compareTo(a.value));
-
-    // E. Return top N matches
     return scoredContacts.take(limit).map((e) => e.key).toList();
   }
 
-  /// 2. RAG GENERATION
-  /// "Who did I meet in SF?" -> Finds contacts -> Returns natural language answer.
+  /// 2. RAG GENERATION (The "Smart" Part)
   Future<String> askYourNetwork(String userQuestion) async {
-    // Step 1: Retrieval
+    // A. RETRIEVE: Find relevant contacts from Isar
     final relevantContacts = await search(userQuestion, limit: 5);
     
     if (relevantContacts.isEmpty) {
-      return "I couldn't find anyone in your network matching that description.";
+      return "I searched your network but couldn't find anyone matching that description. Try adding more contacts or details.";
     }
 
-    // Step 2: Context Construction
-    // We create a mini-prompt containing the data we found
+    // B. AUGMENT: Create the "Context" block
     String contextData = relevantContacts.map((c) => 
-      "- ${c.name} (${c.title} at ${c.company}). Met at: ${c.addressLabel}. Notes: ${c.notes}"
+      "- ${c.name} (${c.title ?? 'No Title'} at ${c.company ?? 'No Company'}). "
+      "Location: ${c.addressLabel ?? 'Unknown'}. "
+      "Notes: ${c.notes ?? ''}. "
+      "Met on: ${c.metAt.toString().split(' ')[0]}"
     ).join("\n");
 
-    // Step 3: Return Context (for now)
-    return "Found ${relevantContacts.length} relevant contacts:\n$contextData"; 
+    // C. GENERATE: Send prompt to Cactus AI
+    final messages = [
+      ChatMessage(
+        role: "system", 
+        content: "You are a helpful networking assistant. Answer the user's question using ONLY the context provided below. If the answer isn't in the context, say you don't know."
+      ),
+      ChatMessage(
+        role: "user", 
+        content: "Context from my contacts:\n$contextData\n\nQuestion: $userQuestion"
+      )
+    ];
+
+    return await _aiService.generateChatResponse(messages);
   }
 }

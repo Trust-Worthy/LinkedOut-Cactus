@@ -221,6 +221,25 @@ class CactusService {
       yield chunk;
     }
   }
+
+  // --- 6. RAG / Simple Chat (Non-Streaming) ---
+  // Added this to help with the RAG pipeline where we just want a single answer
+  Future<String> generateChatResponse(List<ChatMessage> messages) async {
+    if (!isInitialized) await initialize();
+
+    final result = await _lm.generateCompletion(
+      messages: messages,
+      params: CactusCompletionParams(
+        maxTokens: 500, 
+        temperature: 0.7, // Higher creativity for conversation
+      ),
+    );
+
+    if (result.success) {
+      return result.response;
+    }
+    throw Exception("Chat generation failed");
+  }
   
   // --- Helpers & Cleanup ---
 
