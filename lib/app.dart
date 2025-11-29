@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'presentation/screens/home/home_screen.dart';
-import 'presentation/screens/onboarding/onboarding_screen.dart';
+// Change the import to the new screen
+import 'presentation/screens/onboarding/getstarted_screen.dart'; 
 
 class LinkedOutApp extends StatelessWidget {
   final bool startOnboarding;
@@ -16,12 +17,12 @@ class LinkedOutApp extends StatelessWidget {
       title: 'LinkedOut',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00C853)),
+        // Using your friend's blue as the seed color if you prefer, or keep green
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1f6db4)),
         useMaterial3: true,
       ),
-      // If user hasn't downloaded models yet, go to Onboarding
-      // Otherwise, go straight to Home
-      home: startOnboarding ? const OnboardingScreen() : const HomeScreen(),
+      // Logic: If user is new, show GetStartedScreen. Otherwise, Home.
+      home: startOnboarding ? const GetStartedScreen() : const HomeScreen(),
     );
   }
 }
