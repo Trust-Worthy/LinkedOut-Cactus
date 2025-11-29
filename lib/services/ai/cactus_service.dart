@@ -1,5 +1,6 @@
-import 'dart:convert'; // Required for JSON parsing
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:cactus/cactus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
@@ -7,83 +8,72 @@ import 'package:logger/logger.dart';
 class CactusService {
   final Logger _logger = Logger();
   
-  // We use a single instance for memory efficiency during the hackathon
-  final CactusLM _lm = CactusLM();
+  // --- DUAL ENGINE ARCHITECTURE ---
+  // Engine 1: The "Eyes" (Vision / OCR)
+  final CactusLM _visionLM = CactusLM();
   
-  // Singleton Pattern
+  // Engine 2: The "Brain" (Embeddings / Chat / Parsing)
+  final CactusLM _textLM = CactusLM();
+  
   static final CactusService _instance = CactusService._internal();
   factory CactusService() => _instance;
   CactusService._internal();
   static CactusService get instance => _instance;
 
-  // State
   bool isInitialized = false;
-  String? currentModelSlug;
+  String? visionSlug;
+  String? textSlug;
 
-  /// Check if model is already loaded in memory
   bool isModelReady() {
-    return _lm.isLoaded();
+    return _visionLM.isLoaded() && _textLM.isLoaded();
   }
 
-  // --- 1. Model Management (Download & Init) ---
+  // --- 1. Intelligent Model Selection & Download ---
 
-  /// Downloads the best available Vision model.
-  /// Pass a callback so the UI (OnboardingScreen) can update the progress bar.
   Future<void> downloadModel({
     required Function(double progress, String status) onProgress,
   }) async {
     try {
-      // 0. Setup Telemetry
       CactusTelemetry.setTelemetryToken('a83c7f7a-43ad-4823-b012-cbeb587ae788');
-
-      onProgress(0.0, "Fetching model list...");
+      onProgress(0.0, "Analyzing available models...");
       
-      // 1. Get available models and LOG THEM
-      final models = await _lm.getModels();
+      final models = await _visionLM.getModels(); // List is same for both
       
-      _logger.i("=== AVAILABLE MODELS ===");
-      for (var model in models) {
-        _logger.i("Model: ${model.slug}");
-        _logger.i("  - Vision: ${model.supportsVision}");
-        _logger.i("  - Downloaded: ${model.isDownloaded}");
-        _logger.i("  - Size: ${model.sizeMb} MB");
-        _logger.i("---");
-      }
-      _logger.i("========================");
-      
-      // 2. Select a model strategy
-      // Priority: Specific "liquid" vision model -> Any Vision model -> First available
-      final selectedModel = models.firstWhere(
-        (m) => m.slug.contains('liquid') && m.supportsVision,
-        orElse: () => models.firstWhere(
-          (m) => m.supportsVision,
-          orElse: () => models.first,
-        ),
+      // A. Select Best Vision Model (Prioritize Liquid/LFM)
+      final visionModel = models.firstWhere(
+        (m) => m.slug.contains('lfm') && m.supportsVision,
+        orElse: () => models.firstWhere((m) => m.supportsVision),
       );
-      
-      currentModelSlug = selectedModel.slug;
-      _logger.i("✅ Selected Model: $currentModelSlug");
+      visionSlug = visionModel.slug;
 
-      // 3. Check if already downloaded
-      if (selectedModel.isDownloaded) {
-        onProgress(1.0, "Model already downloaded.");
-      } else {
-        // 4. Download
-        await _lm.downloadModel(
-          model: currentModelSlug!,
-          downloadProcessCallback: (progress, status, isError) {
-             if (isError) {
-               onProgress(0.0, "Error: $status");
-               _logger.e("Download failed: $status");
-             } else {
-               onProgress(progress ?? 0.0, status);
-             }
-          },
+      // B. Select Best Text Model (Prioritize Qwen or Gemma for reasoning)
+      // We explicitly exclude the vision model to ensure we get a dedicated text expert
+      final textModel = models.firstWhere(
+        (m) => (m.slug.contains('qwen') || m.slug.contains('gemma')) && !m.supportsVision,
+        orElse: () => models.firstWhere((m) => !m.supportsVision && m.slug != visionSlug),
+      );
+      textSlug = textModel.slug;
+
+      _logger.i("👁️ Vision Model: $visionSlug");
+      _logger.i("🧠 Text Model:   $textSlug");
+
+      // --- Download Phase 1: The Brain (Text) ---
+      if (!textModel.isDownloaded) {
+        await _textLM.downloadModel(
+          model: textSlug!,
+          downloadProcessCallback: (p, s, e) => _handleProgress(p, s, e, onProgress, 0.0, 0.5),
         );
       }
 
-      // 5. Auto-initialize after download
-      onProgress(1.0, "Initializing AI Engine...");
+      // --- Download Phase 2: The Eyes (Vision) ---
+      if (!visionModel.isDownloaded) {
+        await _visionLM.downloadModel(
+          model: visionSlug!,
+          downloadProcessCallback: (p, s, e) => _handleProgress(p, s, e, onProgress, 0.5, 1.0),
+        );
+      }
+
+      onProgress(1.0, "Initializing AI Systems...");
       await initialize();
       
     } catch (e) {
@@ -92,127 +82,125 @@ class CactusService {
     }
   }
 
-  /// Loads the model into memory so it's ready for inference
+  void _handleProgress(double? p, String s, bool e, Function callback, double startRange, double endRange) {
+    if (e) {
+      _logger.e("Download Error: $s");
+    } else {
+      // Map 0.0-1.0 to startRange-endRange
+      final range = endRange - startRange;
+      final actualProgress = startRange + ((p ?? 0.0) * range);
+      callback(actualProgress, s);
+    }
+  }
+
   Future<void> initialize() async {
     if (isInitialized) return;
-    
     try {
-      _logger.i("Initializing model...");
-      
-      // If we don't have a slug yet, try to find one or let Cactus use default
-      if (currentModelSlug == null) {
-         final models = await _lm.getModels();
-         // Try to find a vision model if we haven't selected one
-         final visionModel = models.firstWhere((m) => m.supportsVision, orElse: () => models.first);
-         currentModelSlug = visionModel.slug;
+      // --- FIX: Auto-Select Models if App Restarted ---
+      // If we skipped onboarding/download, these will be null. We must re-select them.
+      if (visionSlug == null || textSlug == null) {
+        _logger.i("Restoring model selection...");
+        final models = await _visionLM.getModels();
+        
+        visionSlug = models.firstWhere(
+          (m) => m.slug.contains('lfm') && m.supportsVision,
+          orElse: () => models.firstWhere((m) => m.supportsVision),
+        ).slug;
+
+        textSlug = models.firstWhere(
+          (m) => (m.slug.contains('qwen') || m.slug.contains('gemma')) && !m.supportsVision,
+          orElse: () => models.firstWhere((m) => !m.supportsVision && m.slug != visionSlug),
+        ).slug;
+        
+        _logger.i("Restored: Vision=$visionSlug, Text=$textSlug");
       }
 
-      await _lm.initializeModel(
-        params: CactusInitParams(model: currentModelSlug!)
-      );
+      _logger.i("Initializing Text Engine ($textSlug)...");
+      await _textLM.initializeModel(params: CactusInitParams(model: textSlug!));
+      
+      _logger.i("Initializing Vision Engine ($visionSlug)...");
+      await _visionLM.initializeModel(params: CactusInitParams(model: visionSlug!));
       
       isInitialized = true;
-      _logger.i("Cactus SDK Initialized & Ready");
+      _logger.i("✅ Both AI Systems Ready");
     } catch (e) {
-      _logger.e("Initialization Error: $e");
+      _logger.e("Init Error: $e");
       rethrow;
     }
   }
 
-  // --- 2. Vision (Business Card OCR) ---
+  // --- 2. Vision Tasks (Use Vision LM) ---
 
-  /// Takes an image path, returns the raw text description/extraction
   Future<String> scanBusinessCard(String imagePath) async {
-    // Auto-wake if not initialized
     if (!isInitialized) await initialize();
-
-    _logger.i("Scanning business card: $imagePath");
+    _logger.i("Running OCR with $visionSlug...");
     
-    try {
-      final result = await _lm.generateCompletion(
-        messages: [
-          ChatMessage(
-            role: "system",
-            content: "You are an expert OCR assistant. Your job is to extract text from business cards accurately.",
-          ),
-          ChatMessage(
-            role: "user",
-            content: "Extract all text from this business card image. Return ONLY the text found.",
-            images: [imagePath],
-          )
-        ],
-        params: CactusCompletionParams(maxTokens: 500),
-      );
-
-      if (result.success) {
-        return result.response;
-      } else {
-        throw Exception("Vision generation failed");
-      }
-    } catch (e) {
-      _logger.e("Vision Error: $e");
-      rethrow;
-    }
+    final result = await _visionLM.generateCompletion(
+      messages: [
+        ChatMessage(role: "user", content: "Read this card.", images: [imagePath])
+      ],
+      params: CactusCompletionParams(maxTokens: 500),
+    );
+    return result.success ? result.response : throw Exception("Vision failed");
   }
 
-  // --- 3. LLM (Parsing to JSON) ---
+  // --- 3. Text Tasks (Use Text LM) ---
 
-  /// Takes raw text, returns a Map of structured data
   Future<Map<String, String?>> parseCardText(String rawText) async {
-    // Auto-wake if not initialized
     if (!isInitialized) await initialize();
+    _logger.i("Parsing text with $textSlug...");
 
-    _logger.i("Parsing extracted text...");
-    
     const prompt = """
-    Parse the following text from a business card into a JSON object with these keys: 
-    name, company, title, email, phone, notes, linkedin. 
-    If a field is not found, return null. 
-    Do not add markdown formatting. Return only JSON.
-    
+    Extract JSON from this business card text. 
+    Fields: name, company, title, email, phone, notes, linkedin.
+    Return ONLY JSON.
     Text:
     """;
 
-    final result = await _lm.generateCompletion(
-      messages: [
-        ChatMessage(role: "user", content: "$prompt$rawText")
-      ],
-      params: CactusCompletionParams(temperature: 0.1), // Low temp for precision
+    final result = await _textLM.generateCompletion(
+      messages: [ChatMessage(role: "user", content: "$prompt$rawText")],
+      params: CactusCompletionParams(temperature: 0.1),
     );
 
-    if (result.success) {
-      return _parseJsonFromResponse(result.response); 
-    }
-    throw Exception("Parsing failed");
+    return result.success ? _parseJsonFromResponse(result.response) : throw Exception("Parsing failed");
   }
 
-  // --- 4. Embeddings (Vector Search) ---
+  // --- 4. Embeddings (Use Text LM - CRITICAL FOR RAG) ---
 
   Future<List<double>> getEmbedding(String text) async {
-    // Auto-wake if not initialized (Crucial for manual adds)
     if (!isInitialized) await initialize();
 
     try {
-      _logger.i("Generating embedding for: ${text.substring(0, min(text.length, 20))}...");
-      final result = await _lm.generateEmbedding(text: text);
-      
-      if (result.success) {
-        _logger.i("Generated embedding with ${result.embeddings.length} dimensions");
-        return result.embeddings;
-      }
-      throw Exception("Embedding failed (Success=false)");
+      // Text models produce MUCH better embeddings than vision models
+      final result = await _textLM.generateEmbedding(text: text);
+      if (result.success) return result.embeddings;
+      throw Exception("Embedding failed");
     } catch (e) {
       _logger.e("Embedding Error: $e");
       return [];
     }
   }
 
-  // --- 5. Chat Streaming ---
+  // --- 5. RAG Chat (Use Text LM) ---
+
+  Future<String> generateChatResponse(List<ChatMessage> messages) async {
+    if (!isInitialized) await initialize();
+    _logger.i("Thinking with $textSlug...");
+
+    final result = await _textLM.generateCompletion(
+      messages: messages,
+      params: CactusCompletionParams(maxTokens: 500, temperature: 0.7),
+    );
+
+    return result.success ? result.response : "I lost my train of thought.";
+  }
+
+  // --- 6. Chat Streaming (Use Text LM) ---
   
   Stream<String> streamChat(List<ChatMessage> history) async* {
     if (!isInitialized) await initialize();
 
-    final result = await _lm.generateCompletionStream(
+    final result = await _textLM.generateCompletionStream(
       messages: history,
       params: CactusCompletionParams(maxTokens: 500),
     );
@@ -221,50 +209,21 @@ class CactusService {
       yield chunk;
     }
   }
-
-  // --- 6. RAG / Simple Chat (Non-Streaming) ---
-  // Added this to help with the RAG pipeline where we just want a single answer
-  Future<String> generateChatResponse(List<ChatMessage> messages) async {
-    if (!isInitialized) await initialize();
-
-    final result = await _lm.generateCompletion(
-      messages: messages,
-      params: CactusCompletionParams(
-        maxTokens: 500, 
-        temperature: 0.7, // Higher creativity for conversation
-      ),
-    );
-
-    if (result.success) {
-      return result.response;
-    }
-    throw Exception("Chat generation failed");
-  }
   
-  // --- Helpers & Cleanup ---
-
-  // Real JSON Parser (Replaces Mock)
+  // --- Helpers ---
   Map<String, String?> _parseJsonFromResponse(String llmOutput) {
     try {
-      _logger.d("Raw LLM Output: $llmOutput");
+      String cleaned = llmOutput.trim()
+          .replaceAll(RegExp(r'```json\s*'), '')
+          .replaceAll(RegExp(r'```\s*'), '');
       
-      // 1. Clean the response (Remove markdown ```json ... ```)
-      String cleaned = llmOutput.trim();
-      cleaned = cleaned.replaceAll(RegExp(r'```json\s*'), '');
-      cleaned = cleaned.replaceAll(RegExp(r'```\s*'), '');
-      
-      // 2. Find JSON object boundaries
       final firstBrace = cleaned.indexOf('{');
       final lastBrace = cleaned.lastIndexOf('}');
-      
       if (firstBrace >= 0 && lastBrace > firstBrace) {
         cleaned = cleaned.substring(firstBrace, lastBrace + 1);
       }
       
-      // 3. Parse JSON
       final Map<String, dynamic> parsed = jsonDecode(cleaned);
-      
-      // 4. Convert to String map safely
       return {
         'name': parsed['name']?.toString(),
         'company': parsed['company']?.toString(),
@@ -274,21 +233,15 @@ class CactusService {
         'linkedin': parsed['linkedin']?.toString(),
         'notes': parsed['notes']?.toString(),
       };
-      
     } catch (e) {
-      _logger.e("JSON parsing failed: $e");
-      // Fallback: return raw text in notes if parsing fails
-      return {
-        'name': null,
-        'company': null,
-        'notes': "Raw Text (Parse Failed): $llmOutput"
-      };
+      return {'name': null, 'notes': "Raw: $llmOutput"};
     }
   }
   
   int min(int a, int b) => a < b ? a : b;
 
   void dispose() {
-    _lm.unload();
+    _visionLM.unload();
+    _textLM.unload();
   }
 }

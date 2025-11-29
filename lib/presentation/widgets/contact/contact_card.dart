@@ -14,10 +14,8 @@ class ContactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Format the date: "Nov 28"
     final dateString = DateFormat('MMM d').format(contact.metAt);
     
-    // Get initials for avatar (e.g., "Sarah Chen" -> "SC")
     String initials = "";
     if (contact.name.isNotEmpty) {
       List<String> parts = contact.name.trim().split(" ");
@@ -98,11 +96,16 @@ class ContactCard extends StatelessWidget {
                               color: Colors.grey.shade500,
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              contact.eventName ?? contact.addressLabel ?? "Unknown",
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade700,
+                            // FIX: Use Flexible to prevent overflow
+                            Flexible(
+                              child: Text(
+                                contact.eventName ?? contact.addressLabel ?? "Unknown",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],

@@ -23,12 +23,22 @@ class VectorSearchService {
     for (var contact in allContacts) {
       if (contact.embedding != null) {
         final score = VectorUtils.cosineSimilarity(queryEmbedding, contact.embedding!);
-        // Only keep somewhat relevant results
-        if (score > 0.3) { 
+        
+        // RELAXED THRESHOLD: 0.15 allows for typos and loose associations
+        if (score > 0.15) { 
           scoredContacts.add(MapEntry(contact, score));
         }
       }
     }
+    // for (var contact in allContacts) {
+    //   if (contact.embedding != null) {
+    //     final score = VectorUtils.cosineSimilarity(queryEmbedding, contact.embedding!);
+    //     // Only keep somewhat relevant results
+    //     if (score > 0.3) { 
+    //       scoredContacts.add(MapEntry(contact, score));
+    //     }
+    //   }
+    // }
 
     // 3. Sort & Filter
     scoredContacts.sort((a, b) => b.value.compareTo(a.value));
