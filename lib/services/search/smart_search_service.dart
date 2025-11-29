@@ -18,6 +18,12 @@ class SmartSearchService {
     
     debugPrint("🎯 Search Intent Raw: $intent");
 
+    // Gatekeeper: If AI thinks this isn't a search, stop immediately.
+    // This prevents returning random cards for queries like "Hello" or "Write a poem".
+    if (intent['is_search'] == false) {
+      return [];
+    }
+
     // 2. Fetch All Contacts
     var contacts = await _repository.getAllContacts();
 
@@ -30,7 +36,7 @@ class SmartSearchService {
     final topicIntent = _safeString(intent['topic']);
 
     // Location Filter
-    if (locationIntent != null && locationIntent.isNotEmpty) {
+    if (locationIntent != null) {
       final loc = locationIntent.toLowerCase();
       contacts = contacts.where((c) => 
         (c.addressLabel ?? '').toLowerCase().contains(loc)
@@ -38,7 +44,7 @@ class SmartSearchService {
     }
 
     // Company Filter
-    if (companyIntent != null && companyIntent.isNotEmpty) {
+    if (companyIntent != null) {
       final comp = companyIntent.toLowerCase();
       contacts = contacts.where((c) => 
         (c.company ?? '').toLowerCase().contains(comp)
@@ -46,7 +52,7 @@ class SmartSearchService {
     }
 
     // Name Filter
-    if (personIntent != null && personIntent.isNotEmpty) {
+    if (personIntent != null) {
       final name = personIntent.toLowerCase();
       contacts = contacts.where((c) => 
         c.name.toLowerCase().contains(name)
@@ -55,8 +61,12 @@ class SmartSearchService {
 
     // 4. Semantic Ranking (The "Vibe" Check)
     if (topicIntent != null || contacts.length > 5) {
-      final topic = topicIntent ?? userQuery; // Fallback to full query
-      contacts = await _rankBySimilarity(contacts, topic);
+      // If topicIntent was empty/null, fallback to userQuery.
+      // Ensure we don't pass an empty string if userQuery was somehow empty (unlikely but safe).
+      final topic = (topicIntent ?? userQuery).trim();
+      if (topic.isNotEmpty) {
+        contacts = await _rankBySimilarity(contacts, topic);
+      }
     }
 
     return contacts;
@@ -64,24 +74,38 @@ class SmartSearchService {
 
   // --- Helpers ---
 
-  // FIX: Robustly handle dynamic types from JSON
+  // FIX: Robustly handle dynamic types AND empty strings
   String? _safeString(dynamic value) {
     if (value == null) return null;
-    if (value is String) return value;
-    if (value is List) return value.join(' '); // Convert ["VC", "Tech"] -> "VC Tech"
-    return value.toString(); // Fallback for numbers/bools
+    
+    String result;
+    if (value is String) {
+      result = value;
+    } else if (value is List) {
+      result = value.join(' '); // Convert ["VC", "Tech"] -> "VC Tech"
+    } else {
+      result = value.toString(); // Fallback for numbers/bools
+    }
+    
+    // Critical Fix: Trim whitespace and return null if empty
+    // This prevents sending " " or "" to the embedding model
+    result = result.trim();
+    return result.isEmpty ? null : result;
   }
 
   Future<Map<String, dynamic>> _parseIntent(String query) async {
     const systemPrompt = """
-    Analyze the search query. Extract entities into JSON:
+    Analyze the input. Determine if the user is searching for specific contacts, people, companies, or locations in their network.
+    
+    Return JSON with these fields:
+    - is_search: (boolean) true if looking for contact info, false if just chitchat or unrelated.
     - location: City/State/Country names
     - company: Organization names
     - person: Specific names
     - topic: Skills, jobs, topics (e.g. "VCs", "Python", "investing")
     
-    Return ONLY JSON. Example: {"location": "Denver", "topic": "software"}
-    If a field is missing, use null.
+    Example: {"is_search": true, "location": "Denver", "topic": "software"}
+    Example: {"is_search": false}
     """;
 
     try {
@@ -98,6 +122,9 @@ class SmartSearchService {
   }
 
   Future<List<Contact>> _rankBySimilarity(List<Contact> contacts, String query) async {
+    // Double check to ensure no empty queries hit the embedding model
+    if (query.trim().isEmpty) return contacts;
+
     final queryEmbedding = await _aiService.getEmbedding(query);
     if (queryEmbedding.isEmpty) return contacts;
 
