@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
 import '../../../services/search/smart_search_service.dart';
+import '../../../core/utils/mock_data_generator.dart'; // Import Mock Generator
 
 // Screens
 import '../scan/scan_screen.dart';
@@ -39,10 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
     try {
       final repo = Provider.of<ContactRepository>(context, listen: false);
-      // The repository now handles filtering out "isMe" contacts in getAllContacts()
-      // But just in case, we can double check here or rely on the repo update.
       final contacts = await repo.getAllContacts();
       
+      // Sort alphabetically for the grouped list view
       contacts.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
       setState(() {
@@ -118,9 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const ProfileScreen())
-                        ).then((_) {
-                          // Optionally reload if profile changes affect UI state
-                        });
+                        ).then((_) => _loadContacts());
                       },
                       child: CircleAvatar(
                         radius: 20,
@@ -170,6 +168,31 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: const Icon(Icons.add, color: Colors.white, size: 24),
                       ),
                     ),
+
+                    // --- NEW: Seed Data Button (Hidden helper for Demo) ---
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () async {
+                        setState(() => _isLoading = true);
+                        final repo = Provider.of<ContactRepository>(context, listen: false);
+                        await MockDataGenerator.generateMockContacts(repo);
+                        await _loadContacts();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Generated 15 Mock Contacts!"))
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800], 
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.cloud_download, color: Colors.white, size: 20),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -210,8 +233,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody() {
     if (_selectedIndex == 1) return const ChatScreen();
     if (_selectedIndex == 3) return const TimelineScreen();
-    
-    // Index 0: Home / Contact List
     return _buildContactList();
   }
 

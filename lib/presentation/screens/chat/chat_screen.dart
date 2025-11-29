@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../data/models/contact.dart';
-import '../../../services/search/vector_search_service.dart'; // Pure Vector Service
+import '../../../services/search/vector_search_service.dart'; // Use updated service
 import '../../widgets/contact/contact_card.dart';
 
+// Chat Item Model
 class ChatItem {
   final bool isUser;
   final String? text;
   final List<Contact>? contacts;
+  final bool isRAG; // Flag to show special styling
 
-  ChatItem({required this.isUser, this.text, this.contacts});
+  ChatItem({
+    required this.isUser, 
+    this.text, 
+    this.contacts,
+    this.isRAG = false,
+  });
 }
 
 class ChatScreen extends StatefulWidget {
@@ -24,12 +31,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatItem> _messages = [];
   bool _isThinking = false;
 
-  // --- FINE TUNE STRICTNESS HERE ---
-  // 0.1 = Very Loose (Finds anything vaguely related)
-  // 0.25 = Balanced (Good for concepts like "Investor")
-  // 0.5 = Strict (Needs strong semantic match)
-  final double _searchStrictness = 0.20; 
-
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -43,22 +44,16 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final searchService = Provider.of<VectorSearchService>(context, listen: false);
       
-      // Run Pure Vector Search
-      final results = await searchService.search(text, threshold: _searchStrictness);
+      // --- USE RAG ---
+      final ragResponse = await searchService.queryWithRAG(text);
 
       setState(() {
-        if (results.isEmpty) {
-          _messages.add(ChatItem(
-            isUser: false, 
-            text: "No matches found. Try adding more detail or lowering strictness."
-          ));
-        } else {
-          _messages.add(ChatItem(
-            isUser: false, 
-            text: "Found ${results.length} matches:",
-            contacts: results,
-          ));
-        }
+        _messages.add(ChatItem(
+          isUser: false, 
+          text: ragResponse.narrative, // The AI's written answer
+          contacts: ragResponse.sources, // The source cards
+          isRAG: true,
+        ));
       });
     } catch (e) {
       setState(() {
@@ -76,12 +71,11 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        title: const Text('Neural Search', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        title: const Text('AI Assistant', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
         centerTitle: true,
       ),
       body: Column(
         children: [
-          // Chat List
           Expanded(
             child: _messages.isEmpty 
               ? _buildEmptyState()
@@ -92,14 +86,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
           ),
           
-          // Loader
           if (_isThinking) 
             const Padding(
               padding: EdgeInsets.all(12),
               child: LinearProgressIndicator(color: Colors.blue, backgroundColor: Colors.grey),
             ),
 
-          // Input
+          // Input Area
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -114,13 +107,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       controller: _controller,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Search by concept (e.g. "Investors")',
+                        hintText: 'Ask complex questions...',
                         hintStyle: TextStyle(color: Colors.grey[600]),
                         border: InputBorder.none,
                         filled: true,
                         fillColor: Colors.grey[850],
                         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        isDense: true,
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                       ),
@@ -148,7 +140,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(20).copyWith(bottomRight: Radius.zero)),
           child: Text(item.text ?? "", style: const TextStyle(color: Colors.white)),
         ),
       );
@@ -161,16 +153,32 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (item.text != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8, left: 4),
-                  child: Text(item.text!, style: const TextStyle(color: Colors.grey)),
+              // The AI Narrative Bubble
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(20).copyWith(bottomLeft: Radius.zero),
                 ),
-              if (item.contacts != null)
-                ...item.contacts!.map((c) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: ContactCard(contact: c, onTap: () {}),
-                )),
+                child: Text(item.text ?? "", style: const TextStyle(color: Colors.white, height: 1.4)),
+              ),
+              
+              // The "Sources" (Contact Cards)
+              if (item.contacts != null && item.contacts!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0, left: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Sources:", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      ...item.contacts!.map((c) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: ContactCard(contact: c, onTap: () {}),
+                      )),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -183,11 +191,11 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.hub, size: 64, color: Colors.grey[800]),
+          Icon(Icons.auto_awesome, size: 64, color: Colors.grey[800]),
           const SizedBox(height: 16),
-          Text("Neural Network Search", style: TextStyle(color: Colors.grey[500], fontSize: 18, fontWeight: FontWeight.bold)),
+          Text("AI Knowledge Base", style: TextStyle(color: Colors.grey[500], fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text("Finds concepts, not just keywords.", style: TextStyle(color: Colors.grey[600])),
+          Text("Ask me anything about your network.", style: TextStyle(color: Colors.grey[600])),
         ],
       ),
     );
