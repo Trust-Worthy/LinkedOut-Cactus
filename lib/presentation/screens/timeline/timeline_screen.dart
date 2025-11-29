@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
+import '../contact/contact_detail_screen.dart';
 
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key});
@@ -28,28 +29,65 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Contact>>(
-      future: _contactsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        final contacts = snapshot.data ?? [];
-        
-        if (contacts.isEmpty) {
-          return const Center(child: Text("No history yet."));
-        }
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('Timeline'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh)
+        ],
+      ),
+      body: FutureBuilder<List<Contact>>(
+        future: _contactsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: contacts.length,
-          itemBuilder: (context, index) {
-            final contact = contacts[index];
-            return _buildTimelineItem(contact, index == contacts.length - 1);
-          },
-        );
-      },
+          final contacts = snapshot.data ?? [];
+
+          if (contacts.isEmpty) {
+            return const Center(child: Text("No history yet.", style: TextStyle(color: Colors.white)));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: contacts.length,
+            itemBuilder: (context, index) {
+              final contact = contacts[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ContactDetailScreen(contact: contact)),
+                  ).then((_) => _refresh());
+                },
+                onLongPress: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete contact?'),
+                      content: const Text('This action cannot be undone.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    await Provider.of<ContactRepository>(context, listen: false).deleteContact(contact.id);
+                    _refresh();
+                  }
+                },
+                child: _buildTimelineItem(contact, index == contacts.length - 1),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -65,7 +103,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
                 width: 12,
                 height: 12,
                 decoration: const BoxDecoration(
-                  color: Colors.black,
+                  color: Colors.white,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -73,7 +111,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: Colors.grey.shade300,
+                    color: Colors.grey.shade800,
                   ),
                 ),
             ],
@@ -90,7 +128,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   Text(
                     DateFormat('MMM d, yyyy').format(contact.metAt),
                     style: TextStyle(
-                      color: Colors.grey.shade600,
+                      color: Colors.grey.shade500,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -98,20 +136,32 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   const SizedBox(height: 4),
                   Text(
                     contact.name,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   Text(
-                    "${contact.title ?? 'No Title'} @ ${contact.company ?? 'No Company'}",
-                    style: const TextStyle(color: Colors.black54),
+                    "${contact.title ?? 'No Title'} • ${contact.company ?? 'No Company'}",
+                    style: TextStyle(color: Colors.grey.shade500),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
+                  if (contact.eventName != null && contact.eventName!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(contact.eventName!, style: const TextStyle(color: Colors.blueAccent, fontSize: 13)),
+                    ),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       const Icon(Icons.location_on, size: 14, color: Colors.grey),
                       const SizedBox(width: 4),
-                      Text(
-                        contact.addressLabel ?? "Unknown Location",
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      Expanded(
+                        child: Text(
+                          contact.addressLabel ?? "Unknown Location",
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                        ),
                       ),
                     ],
                   ),

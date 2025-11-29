@@ -50,6 +50,7 @@ class Contact {
 
   // --- Metadata ---
   String? rawScannedText; 
+  String? avatarPath;
 
   Contact({
     required this.name,
@@ -73,5 +74,6 @@ class Contact {
     this.isFollowUpCompleted = false,
     this.embedding,
     this.rawScannedText,
+    this.avatarPath,
   }) : lastInteractedAt = DateTime.now();
 }

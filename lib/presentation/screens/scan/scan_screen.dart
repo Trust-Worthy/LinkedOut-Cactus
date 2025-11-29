@@ -4,7 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../../../services/ai/cactus_service.dart';
 import '../../../services/location/location_service.dart';
-import '../../../core/utils/business_card_extractor.dart'; 
+import '../../../core/utils/business_card_extractor.dart';
 import 'scan_result_screen.dart';
 
 class ScanScreen extends StatefulWidget {
@@ -224,15 +224,15 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: Colors.black,
           borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.lightbulb_outline, size: 60, color: Color(0xFF1F6DB4)),
+            const Icon(Icons.lightbulb_outline, size: 60, color: Colors.white),
             const SizedBox(height: 16),
-            const Text('Scan Tips', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('Scan Tips', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 16),
             _buildTipItem(Icons.crop_free, 'Frame it', 'Keep text inside the box'),
             const SizedBox(height: 12),
@@ -262,13 +262,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   Widget _buildTipItem(IconData icon, String title, String desc) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF1F6DB4)),
+        Icon(icon, color: Colors.white),
         const SizedBox(width: 16),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(desc, style: const TextStyle(color: Colors.grey)),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(desc, style: const TextStyle(color: Colors.grey, fontSize: 14)),
           ],
         )
       ],
@@ -365,16 +365,24 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           // Bottom Bar
           Positioned(
             bottom: 40, left: 24, right: 24,
-            child: ElevatedButton(
-              onPressed: isScanning ? null : _captureAndProcessText,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1F6DB4),
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: isScanning 
-                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white))
-                : const Text("Capture Card", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isScanning ? null : _captureAndProcessText,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1F6DB4),
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: isScanning 
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white))
+                      : const Text("Capture Card", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
           ),
         ],

@@ -179,17 +179,17 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("Verify Details"),
+        title: const Text("Verify Details", style: TextStyle(color: Colors.white)),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        leading: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context)),
         actions: [
           TextButton(
             onPressed: _isSaving ? null : _saveContact,
-            child: const Text("SAVE", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("SAVE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           )
         ],
       ),
@@ -202,24 +202,24 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
             _buildField("Name", _nameController, isRequired: true),
             _buildField("Job Title", _titleController),
             _buildField("Company", _companyController),
-            
+
             const SizedBox(height: 20),
             _buildSectionTitle("Context"),
             Row(
               children: [
                 Expanded(
                   child: _buildField(
-                    "Met At (City)", 
-                    _locationController, 
-                    suffixIcon: _isFetchingLocation 
-                      ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                    "Met At (City)",
+                    _locationController,
+                    suffixIcon: _isFetchingLocation
+                      ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : IconButton(icon: const Icon(Icons.my_location, color: Colors.blue), onPressed: _fetchLocation),
                   ),
                 ),
               ],
             ),
             _buildField("Event Name", _eventController, hint: "e.g. Tech Conference"),
-            
+
             const SizedBox(height: 20),
             _buildSectionTitle("Contact Info"),
             _buildField("Email", _emailController, keyboardType: TextInputType.emailAddress),
@@ -240,9 +240,9 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade100),
+                border: Border.all(color: Colors.grey[800]!),
               ),
               child: Column(
                 children: [
@@ -250,9 +250,9 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                     controller: _outreachController,
                     maxLines: 4,
                     decoration: const InputDecoration(border: InputBorder.none),
-                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                    style: const TextStyle(fontSize: 14, color: Colors.white),
                   ),
-                  const Divider(),
+                  const Divider(color: Colors.grey),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
@@ -260,8 +260,8 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                         // TODO: Implement Copy to Clipboard
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Draft copied!")));
                       },
-                      icon: const Icon(Icons.copy, size: 16),
-                      label: const Text("Copy Draft"),
+                      icon: const Icon(Icons.copy, size: 16, color: Colors.white),
+                      label: const Text("Copy Draft", style: TextStyle(color: Colors.white)),
                     ),
                   )
                 ],
@@ -273,7 +273,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
             Slider(
               value: _followUpWeeks,
               min: 0, max: 4, divisions: 4,
-              activeColor: Colors.black,
+              activeColor: Colors.blue,
               label: _getSliderLabel(_followUpWeeks),
               onChanged: (val) {
                 double newVal = val;
@@ -284,7 +284,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                 setState(() => _followUpWeeks = newVal);
               },
             ),
-            Center(child: Text(_getSliderLabel(_followUpWeeks), style: const TextStyle(fontWeight: FontWeight.bold))),
+            Center(child: Text(_getSliderLabel(_followUpWeeks), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white))),
 
             const SizedBox(height: 40),
           ],
@@ -296,7 +296,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Text(title.toUpperCase(), style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+      child: Text(title.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
     );
   }
 
@@ -307,11 +307,16 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
+        style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: const TextStyle(color: Colors.grey),
           hintText: hint,
+          hintStyle: const TextStyle(color: Colors.grey),
           alignLabelWithHint: maxLines > 1,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          filled: true,
+          fillColor: Colors.grey[850],
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           suffixIcon: suffixIcon,
         ),
