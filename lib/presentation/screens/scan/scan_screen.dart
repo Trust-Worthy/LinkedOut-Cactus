@@ -18,11 +18,10 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   CameraController? cameraController;
   bool isScanning = false;
   bool flashOn = false;
-  bool showTipsSheet = true; // Flag to control tips display
+  bool showTipsSheet = true;
   late AnimationController _animationController;
   final TextRecognizer textRecognizer = TextRecognizer(); 
 
-  // Live status notifier for the loading dialog
   final ValueNotifier<String> _loadingStatus = ValueNotifier("Initializing...");
 
   @override
@@ -47,7 +46,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         await cameraController!.initialize();
         if (mounted) {
           setState(() {});
-          // Show tips after a short delay so the camera view is visible first
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted && showTipsSheet) {
               _showTipsBottomSheet();
@@ -99,7 +97,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     }
   }
 
-  // --- LOGIC: Regex + AI + GPS (With Status Updates) ---
   Future<void> _handleAIOrganization(String rawText) async {
     _showLoadingDialog();
 
@@ -112,14 +109,13 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       _loadingStatus.value = "Acquiring GPS...";
       dynamic position;
       try {
-        // Give GPS 2.5 seconds max, otherwise proceed without it
         position = await LocationService.instance.getCurrentLocation()
             .timeout(const Duration(milliseconds: 2500), onTimeout: () => null);
       } catch (e) {
         debugPrint("GPS Timeout/Error: $e");
       }
 
-      // 3. AI Parsing (Heavy Lift)
+      // 3. AI Parsing
       _loadingStatus.value = "Waking up AI Brain...";
       final aiData = await CactusService.instance.parseCardText(rawText);
 
@@ -136,17 +132,26 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         'notes': (aiData['notes'] ?? "") + "\n\nRaw Scan:\n" + rawText, 
       };
 
-      // 5. Resolve Address (Offline)
+      // 5. Address Handling (RESTORED LOGIC)
+      // Priority: 1. GPS->City (Offline DB)  2. Regex Address  3. Empty
       String? address = regexData.address;
       double? lat, lng;
       
       if (position != null) {
         lat = position.latitude;
         lng = position.longitude;
-        // Lookup offline city name
-        final gpsAddress = await LocationService.instance.getAddressLabel(lat!, lng!);
-        if (gpsAddress != null) {
-          address = gpsAddress;
+        
+        // Try to find city name in offline database
+        final gpsCity = await LocationService.instance.getAddressLabel(lat!, lng!);
+        
+        if (gpsCity != null) {
+          // Success: We found the city in our offline DB
+          address = gpsCity;
+        } else {
+          // Failure: GPS extracted, but city not in DB.
+          // We keep 'address' as whatever the Regex found, or null.
+          // The user will see the GPS coords stored, but the text field might be empty
+          // allowing them to type "Small Town, USA" manually.
         }
       }
 
@@ -175,7 +180,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     }
   }
 
-  // --- UPDATED LOADING DIALOG (Live Status) ---
   void _showLoadingDialog() {
     showDialog(
       context: context,
@@ -195,7 +199,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
-                // Live status update widget
                 ValueListenableBuilder<String>(
                   valueListenable: _loadingStatus,
                   builder: (context, value, child) {
@@ -214,7 +217,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- UI HELPERS ---
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
 
   void _showTipsBottomSheet() {
     showModalBottomSheet(
@@ -275,12 +282,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (cameraController == null || !cameraController!.value.isInitialized) {
@@ -294,10 +295,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Camera Preview
           Positioned.fill(child: CameraPreview(cameraController!)),
-          
-          // Custom Overlay (Friend's Style)
           CustomPaint(
             painter: ScannerOverlay(
               scanWindow: Rect.fromCenter(
@@ -308,8 +306,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             ),
             child: const SizedBox.expand(),
           ),
-
-          // Top Bar
           Positioned(
             top: 0, left: 0, right: 0,
             child: SafeArea(
@@ -331,38 +327,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               ),
             ),
           ),
-
-          // Scanning animation line
-          if (!isScanning)
-            Positioned(
-              top: MediaQuery.of(context).size.height * 0.28,
-              left: MediaQuery.of(context).size.width * 0.075,
-              right: MediaQuery.of(context).size.width * 0.075,
-              child: AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(
-                      0,
-                      _animationController.value * MediaQuery.of(context).size.width * 0.55,
-                    ),
-                    child: Container(
-                      height: 3,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Colors.transparent, Colors.white, Colors.transparent],
-                        ),
-                        boxShadow: [
-                          BoxShadow(color: Colors.white.withOpacity(0.8), blurRadius: 10, spreadRadius: 2),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-          // Bottom Bar
           Positioned(
             bottom: 40, left: 24, right: 24,
             child: Column(
@@ -391,7 +355,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
   }
 }
 
-// Overlay Painter (Friend's visual style)
 class ScannerOverlay extends CustomPainter {
   final Rect scanWindow;
   ScannerOverlay({required this.scanWindow});
@@ -400,14 +363,8 @@ class ScannerOverlay extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final backgroundPath = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
     final cutoutPath = Path()..addRRect(RRect.fromRectAndRadius(scanWindow, const Radius.circular(20)));
-
     final backgroundPaint = Paint()..color = Colors.black.withOpacity(0.5)..style = PaintingStyle.fill;
-
-    canvas.drawPath(
-      Path.combine(PathOperation.difference, backgroundPath, cutoutPath),
-      backgroundPaint,
-    );
-
+    canvas.drawPath(Path.combine(PathOperation.difference, backgroundPath, cutoutPath), backgroundPaint);
     final borderPaint = Paint()..color = Colors.white..strokeWidth = 4..style = PaintingStyle.stroke;
     canvas.drawRRect(RRect.fromRectAndRadius(scanWindow, const Radius.circular(20)), borderPaint);
   }
