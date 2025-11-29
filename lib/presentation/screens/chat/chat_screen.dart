@@ -1,6 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../services/search/vector_search_service.dart';
+import '../../../data/models/contact.dart';
+import '../../../services/search/smart_search_service.dart';
+import '../../widgets/contact/contact_card.dart';
+
+// Model for chat messages
+class ChatItem {
+  final bool isUser;
+  final String? text;
+  final List<Contact>? contacts;
+
+  ChatItem({required this.isUser, this.text, this.contacts});
+}
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -11,7 +22,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-  final List<Map<String, String>> _messages = []; // {role: "user"|"ai", text: "..."}
+  final List<ChatItem> _messages = [];
   bool _isThinking = false;
 
   Future<void> _sendMessage() async {
@@ -19,22 +30,34 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return;
 
     setState(() {
-      _messages.add({"role": "user", "text": text});
+      _messages.add(ChatItem(isUser: true, text: text));
       _isThinking = true;
       _controller.clear();
     });
 
     try {
-      final searchService = Provider.of<VectorSearchService>(context, listen: false);
-      // This performs the RAG lookup
-      final response = await searchService.askYourNetwork(text);
+      // Use the new Smart Search Service
+      final searchService = Provider.of<SmartSearchService>(context, listen: false);
+      final results = await searchService.search(text);
 
       setState(() {
-        _messages.add({"role": "ai", "text": response});
+        if (results.isEmpty) {
+          _messages.add(ChatItem(
+            isUser: false, 
+            text: "I searched your network but couldn't find anyone matching that."
+          ));
+        } else {
+          // Add a summary text + the contact cards
+          _messages.add(ChatItem(
+            isUser: false, 
+            text: "Found ${results.length} matching contacts:",
+            contacts: results,
+          ));
+        }
       });
     } catch (e) {
       setState(() {
-        _messages.add({"role": "ai", "text": "I had trouble accessing your network memory. Error: $e"});
+        _messages.add(ChatItem(isUser: false, text: "Error: $e"));
       });
     } finally {
       setState(() => _isThinking = false);
@@ -53,24 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: const EdgeInsets.all(16),
                 itemCount: _messages.length,
                 itemBuilder: (context, index) {
-                  final msg = _messages[index];
-                  final isUser = msg['role'] == 'user';
-                  return Align(
-                    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(12),
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
-                      decoration: BoxDecoration(
-                        color: isUser ? Colors.black : Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        msg['text']!,
-                        style: TextStyle(color: isUser ? Colors.white : Colors.black87),
-                      ),
-                    ),
-                  );
+                  return _buildMessageItem(_messages[index]);
                 },
               ),
         ),
@@ -79,7 +85,14 @@ class _ChatScreenState extends State<ChatScreen> {
         if (_isThinking) 
           const Padding(
             padding: EdgeInsets.all(8.0),
-            child: Text("Thinking...", style: TextStyle(color: Colors.grey, fontSize: 12)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 8),
+                Text("Analyzing network...", style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
           ),
         Container(
           padding: const EdgeInsets.all(16),
@@ -118,6 +131,68 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildMessageItem(ChatItem item) {
+    if (item.isUser) {
+      // User Message (Right Bubble)
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(16).copyWith(bottomRight: Radius.zero),
+          ),
+          child: Text(
+            item.text ?? "",
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    } else {
+      // AI Message (Left Bubble + Cards)
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          width: MediaQuery.of(context).size.width * 0.85,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // AI Text Response
+              if (item.text != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(16).copyWith(bottomLeft: Radius.zero),
+                  ),
+                  child: Text(item.text!, style: const TextStyle(color: Colors.black87)),
+                ),
+              
+              // Result Cards
+              if (item.contacts != null && item.contacts!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Column(
+                    children: item.contacts!.map((c) => 
+                      ContactCard(
+                        contact: c, 
+                        onTap: () {
+                          // TODO: Navigate to detail
+                          debugPrint("Tapped ${c.name}");
+                        },
+                      )
+                    ).toList(),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -125,30 +200,31 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Icon(Icons.auto_awesome, size: 48, color: Colors.grey.shade300),
           const SizedBox(height: 16),
-          Text("Chat with your Network", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
-          const SizedBox(height: 8),
-          const Text("Try asking:", style: TextStyle(color: Colors.grey)),
+          const Text("Chat with your Network", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          _suggestionChip("Who did I meet in Denver?"),
-          _suggestionChip("Who knows about VCs?"),
-          _suggestionChip("Last person I met?"),
+          Wrap(
+            spacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _suggestionChip("Who did I meet in Denver?"),
+              _suggestionChip("List investors I know"),
+              _suggestionChip("Who works at Google?"),
+            ],
+          ),
         ],
       ),
     );
   }
 
   Widget _suggestionChip(String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: ActionChip(
-        label: Text(label),
-        backgroundColor: Colors.white,
-        side: BorderSide(color: Colors.grey.shade200),
-        onPressed: () {
-          _controller.text = label;
-          _sendMessage();
-        },
-      ),
+    return ActionChip(
+      label: Text(label),
+      backgroundColor: Colors.white,
+      side: BorderSide(color: Colors.grey.shade200),
+      onPressed: () {
+        _controller.text = label;
+        _sendMessage();
+      },
     );
   }
 }

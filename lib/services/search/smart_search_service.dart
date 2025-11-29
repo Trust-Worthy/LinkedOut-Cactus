@@ -14,46 +14,48 @@ class SmartSearchService {
 
   Future<List<Contact>> search(String userQuery) async {
     // 1. Analyze Intent (The "Router" Agent)
-    // We ask the LLM to extract structured data instead of writing a paragraph.
     final intent = await _parseIntent(userQuery);
     
-    debugPrint("🎯 Search Intent: $intent");
+    debugPrint("🎯 Search Intent Raw: $intent");
 
     // 2. Fetch All Contacts
-    // For on-device DBs (< 10k items), fetching all is faster than complex SQL queries
     var contacts = await _repository.getAllContacts();
 
     // 3. Apply Hard Filters (Fast & Accurate)
+    // We use _safeString to prevent crashes if LLM returns a List instead of String
     
+    final locationIntent = _safeString(intent['location']);
+    final companyIntent = _safeString(intent['company']);
+    final personIntent = _safeString(intent['person']);
+    final topicIntent = _safeString(intent['topic']);
+
     // Location Filter
-    if (intent['location'] != null && intent['location'].isNotEmpty) {
-      final loc = intent['location'].toLowerCase();
+    if (locationIntent != null && locationIntent.isNotEmpty) {
+      final loc = locationIntent.toLowerCase();
       contacts = contacts.where((c) => 
         (c.addressLabel ?? '').toLowerCase().contains(loc)
       ).toList();
     }
 
     // Company Filter
-    if (intent['company'] != null && intent['company'].isNotEmpty) {
-      final comp = intent['company'].toLowerCase();
+    if (companyIntent != null && companyIntent.isNotEmpty) {
+      final comp = companyIntent.toLowerCase();
       contacts = contacts.where((c) => 
         (c.company ?? '').toLowerCase().contains(comp)
       ).toList();
     }
 
     // Name Filter
-    if (intent['person'] != null && intent['person'].isNotEmpty) {
-      final name = intent['person'].toLowerCase();
+    if (personIntent != null && personIntent.isNotEmpty) {
+      final name = personIntent.toLowerCase();
       contacts = contacts.where((c) => 
         c.name.toLowerCase().contains(name)
       ).toList();
     }
 
     // 4. Semantic Ranking (The "Vibe" Check)
-    // If we have a 'topic' or 'skill', or if filters didn't narrow it down enough,
-    // we use vector search on the remaining results.
-    if (intent['topic'] != null || contacts.length > 5) {
-      final topic = intent['topic'] ?? userQuery; // Fallback to full query
+    if (topicIntent != null || contacts.length > 5) {
+      final topic = topicIntent ?? userQuery; // Fallback to full query
       contacts = await _rankBySimilarity(contacts, topic);
     }
 
@@ -61,6 +63,14 @@ class SmartSearchService {
   }
 
   // --- Helpers ---
+
+  // FIX: Robustly handle dynamic types from JSON
+  String? _safeString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value;
+    if (value is List) return value.join(' '); // Convert ["VC", "Tech"] -> "VC Tech"
+    return value.toString(); // Fallback for numbers/bools
+  }
 
   Future<Map<String, dynamic>> _parseIntent(String query) async {
     const systemPrompt = """
@@ -83,7 +93,7 @@ class SmartSearchService {
       return _cleanAndParseJson(response);
     } catch (e) {
       debugPrint("Intent parsing failed: $e");
-      return {}; // Fallback to empty intent (will just return all contacts or vector search)
+      return {}; 
     }
   }
 
@@ -95,17 +105,16 @@ class SmartSearchService {
 
     for (var c in contacts) {
       if (c.embedding != null) {
-        // Dimension check
         if (c.embedding!.length == queryEmbedding.length) {
           final score = VectorUtils.cosineSimilarity(queryEmbedding, c.embedding!);
-          if (score > 0.15) { // Threshold
+          if (score > 0.15) { 
             scored.add(MapEntry(c, score));
           }
         }
       }
     }
 
-    scored.sort((a, b) => b.value.compareTo(a.value)); // High score first
+    scored.sort((a, b) => b.value.compareTo(a.value)); 
     return scored.map((e) => e.key).toList();
   }
 

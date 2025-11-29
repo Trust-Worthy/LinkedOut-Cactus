@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'services/location/offline_geocoding_service.dart';
 import 'services/search/vector_search_service.dart';
 import 'services/ai/cactus_service.dart';
-
+import 'services/search/smart_search_service.dart'; // ADD THIS IMPORT
 // Data & App
 import 'app.dart';
 import 'data/local/database/isar_service.dart';
@@ -31,12 +31,19 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        // Repository
         Provider<ContactRepository>(
           create: (_) => ContactRepository(isarService),
         ),
         
-        // Search Service (Requires Repo + AI Service)
+        // Add the Smart Search Service
+        Provider<SmartSearchService>(
+          create: (context) => SmartSearchService(
+            context.read<ContactRepository>(),
+            CactusService.instance,
+          ),
+        ),
+        
+        // Keep Vector Search if needed elsewhere, or remove if fully replaced
         Provider<VectorSearchService>(
           create: (context) => VectorSearchService(
             context.read<ContactRepository>(),
