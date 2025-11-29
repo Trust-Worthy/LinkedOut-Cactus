@@ -42,59 +42,84 @@ const ContactSchema = CollectionSchema(
       name: r'eventName',
       type: IsarType.string,
     ),
-    r'isEventMode': PropertySchema(
+    r'followUpScheduledFor': PropertySchema(
       id: 5,
+      name: r'followUpScheduledFor',
+      type: IsarType.dateTime,
+    ),
+    r'instagram': PropertySchema(
+      id: 6,
+      name: r'instagram',
+      type: IsarType.string,
+    ),
+    r'isEventMode': PropertySchema(
+      id: 7,
       name: r'isEventMode',
       type: IsarType.bool,
     ),
+    r'isFollowUpCompleted': PropertySchema(
+      id: 8,
+      name: r'isFollowUpCompleted',
+      type: IsarType.bool,
+    ),
     r'lastInteractedAt': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'lastInteractedAt',
       type: IsarType.dateTime,
     ),
     r'latitude': PropertySchema(
-      id: 7,
+      id: 10,
       name: r'latitude',
       type: IsarType.double,
     ),
+    r'linkedin': PropertySchema(
+      id: 11,
+      name: r'linkedin',
+      type: IsarType.string,
+    ),
     r'longitude': PropertySchema(
-      id: 8,
+      id: 12,
       name: r'longitude',
       type: IsarType.double,
     ),
     r'metAt': PropertySchema(
-      id: 9,
+      id: 13,
       name: r'metAt',
       type: IsarType.dateTime,
     ),
     r'name': PropertySchema(
-      id: 10,
+      id: 14,
       name: r'name',
       type: IsarType.string,
     ),
     r'notes': PropertySchema(
-      id: 11,
+      id: 15,
       name: r'notes',
       type: IsarType.string,
     ),
     r'phone': PropertySchema(
-      id: 12,
+      id: 16,
       name: r'phone',
       type: IsarType.string,
     ),
     r'rawScannedText': PropertySchema(
-      id: 13,
+      id: 17,
       name: r'rawScannedText',
       type: IsarType.string,
     ),
     r'tags': PropertySchema(
-      id: 14,
+      id: 18,
       name: r'tags',
       type: IsarType.stringList,
     ),
     r'title': PropertySchema(
-      id: 15,
+      id: 19,
       name: r'title',
+      type: IsarType.string,
+    ),
+    r'twitter': PropertySchema(
+      id: 20,
+      name: r'twitter',
       type: IsarType.string,
     )
   },
@@ -162,6 +187,18 @@ int _contactEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.instagram;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.linkedin;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.name.length * 3;
   {
     final value = object.notes;
@@ -199,6 +236,12 @@ int _contactEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.twitter;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -213,17 +256,22 @@ void _contactSerialize(
   writer.writeString(offsets[2], object.email);
   writer.writeDoubleList(offsets[3], object.embedding);
   writer.writeString(offsets[4], object.eventName);
-  writer.writeBool(offsets[5], object.isEventMode);
-  writer.writeDateTime(offsets[6], object.lastInteractedAt);
-  writer.writeDouble(offsets[7], object.latitude);
-  writer.writeDouble(offsets[8], object.longitude);
-  writer.writeDateTime(offsets[9], object.metAt);
-  writer.writeString(offsets[10], object.name);
-  writer.writeString(offsets[11], object.notes);
-  writer.writeString(offsets[12], object.phone);
-  writer.writeString(offsets[13], object.rawScannedText);
-  writer.writeStringList(offsets[14], object.tags);
-  writer.writeString(offsets[15], object.title);
+  writer.writeDateTime(offsets[5], object.followUpScheduledFor);
+  writer.writeString(offsets[6], object.instagram);
+  writer.writeBool(offsets[7], object.isEventMode);
+  writer.writeBool(offsets[8], object.isFollowUpCompleted);
+  writer.writeDateTime(offsets[9], object.lastInteractedAt);
+  writer.writeDouble(offsets[10], object.latitude);
+  writer.writeString(offsets[11], object.linkedin);
+  writer.writeDouble(offsets[12], object.longitude);
+  writer.writeDateTime(offsets[13], object.metAt);
+  writer.writeString(offsets[14], object.name);
+  writer.writeString(offsets[15], object.notes);
+  writer.writeString(offsets[16], object.phone);
+  writer.writeString(offsets[17], object.rawScannedText);
+  writer.writeStringList(offsets[18], object.tags);
+  writer.writeString(offsets[19], object.title);
+  writer.writeString(offsets[20], object.twitter);
 }
 
 Contact _contactDeserialize(
@@ -238,19 +286,24 @@ Contact _contactDeserialize(
     email: reader.readStringOrNull(offsets[2]),
     embedding: reader.readDoubleList(offsets[3]),
     eventName: reader.readStringOrNull(offsets[4]),
-    isEventMode: reader.readBoolOrNull(offsets[5]) ?? false,
-    latitude: reader.readDoubleOrNull(offsets[7]),
-    longitude: reader.readDoubleOrNull(offsets[8]),
-    metAt: reader.readDateTime(offsets[9]),
-    name: reader.readString(offsets[10]),
-    notes: reader.readStringOrNull(offsets[11]),
-    phone: reader.readStringOrNull(offsets[12]),
-    rawScannedText: reader.readStringOrNull(offsets[13]),
-    tags: reader.readStringList(offsets[14]),
-    title: reader.readStringOrNull(offsets[15]),
+    followUpScheduledFor: reader.readDateTimeOrNull(offsets[5]),
+    instagram: reader.readStringOrNull(offsets[6]),
+    isEventMode: reader.readBoolOrNull(offsets[7]) ?? false,
+    isFollowUpCompleted: reader.readBoolOrNull(offsets[8]) ?? false,
+    latitude: reader.readDoubleOrNull(offsets[10]),
+    linkedin: reader.readStringOrNull(offsets[11]),
+    longitude: reader.readDoubleOrNull(offsets[12]),
+    metAt: reader.readDateTime(offsets[13]),
+    name: reader.readString(offsets[14]),
+    notes: reader.readStringOrNull(offsets[15]),
+    phone: reader.readStringOrNull(offsets[16]),
+    rawScannedText: reader.readStringOrNull(offsets[17]),
+    tags: reader.readStringList(offsets[18]),
+    title: reader.readStringOrNull(offsets[19]),
+    twitter: reader.readStringOrNull(offsets[20]),
   );
   object.id = id;
-  object.lastInteractedAt = reader.readDateTime(offsets[6]);
+  object.lastInteractedAt = reader.readDateTime(offsets[9]);
   return object;
 }
 
@@ -272,26 +325,36 @@ P _contactDeserializeProp<P>(
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readBoolOrNull(offset) ?? false) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 6:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readBoolOrNull(offset) ?? false) as P;
     case 8:
-      return (reader.readDoubleOrNull(offset)) as P;
+      return (reader.readBoolOrNull(offset) ?? false) as P;
     case 9:
       return (reader.readDateTime(offset)) as P;
     case 10:
-      return (reader.readString(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 11:
       return (reader.readStringOrNull(offset)) as P;
     case 12:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 13:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 14:
-      return (reader.readStringList(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 15:
+      return (reader.readStringOrNull(offset)) as P;
+    case 16:
+      return (reader.readStringOrNull(offset)) as P;
+    case 17:
+      return (reader.readStringOrNull(offset)) as P;
+    case 18:
+      return (reader.readStringList(offset)) as P;
+    case 19:
+      return (reader.readStringOrNull(offset)) as P;
+    case 20:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1281,6 +1344,80 @@ extension ContactQueryFilter
     });
   }
 
+  QueryBuilder<Contact, Contact, QAfterFilterCondition>
+      followUpScheduledForIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'followUpScheduledFor',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition>
+      followUpScheduledForIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'followUpScheduledFor',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition>
+      followUpScheduledForEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'followUpScheduledFor',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition>
+      followUpScheduledForGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'followUpScheduledFor',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition>
+      followUpScheduledForLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'followUpScheduledFor',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition>
+      followUpScheduledForBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'followUpScheduledFor',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Contact, Contact, QAfterFilterCondition> idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -1333,11 +1470,167 @@ extension ContactQueryFilter
     });
   }
 
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'instagram',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'instagram',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'instagram',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'instagram',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'instagram',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'instagram',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'instagram',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'instagram',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'instagram',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'instagram',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'instagram',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> instagramIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'instagram',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Contact, Contact, QAfterFilterCondition> isEventModeEqualTo(
       bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'isEventMode',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition>
+      isFollowUpCompletedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isFollowUpCompleted',
         value: value,
       ));
     });
@@ -1472,6 +1765,152 @@ extension ContactQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'linkedin',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'linkedin',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'linkedin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'linkedin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'linkedin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'linkedin',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'linkedin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'linkedin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'linkedin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'linkedin',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'linkedin',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> linkedinIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'linkedin',
+        value: '',
       ));
     });
   }
@@ -2556,6 +2995,152 @@ extension ContactQueryFilter
       ));
     });
   }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'twitter',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'twitter',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'twitter',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'twitter',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'twitter',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'twitter',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'twitter',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'twitter',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'twitter',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'twitter',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'twitter',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> twitterIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'twitter',
+        value: '',
+      ));
+    });
+  }
 }
 
 extension ContactQueryObject
@@ -2613,6 +3198,31 @@ extension ContactQuerySortBy on QueryBuilder<Contact, Contact, QSortBy> {
     });
   }
 
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByFollowUpScheduledFor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'followUpScheduledFor', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy>
+      sortByFollowUpScheduledForDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'followUpScheduledFor', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByInstagram() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'instagram', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByInstagramDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'instagram', Sort.desc);
+    });
+  }
+
   QueryBuilder<Contact, Contact, QAfterSortBy> sortByIsEventMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isEventMode', Sort.asc);
@@ -2622,6 +3232,18 @@ extension ContactQuerySortBy on QueryBuilder<Contact, Contact, QSortBy> {
   QueryBuilder<Contact, Contact, QAfterSortBy> sortByIsEventModeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isEventMode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByIsFollowUpCompleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFollowUpCompleted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByIsFollowUpCompletedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFollowUpCompleted', Sort.desc);
     });
   }
 
@@ -2646,6 +3268,18 @@ extension ContactQuerySortBy on QueryBuilder<Contact, Contact, QSortBy> {
   QueryBuilder<Contact, Contact, QAfterSortBy> sortByLatitudeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'latitude', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByLinkedin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'linkedin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByLinkedinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'linkedin', Sort.desc);
     });
   }
 
@@ -2732,6 +3366,18 @@ extension ContactQuerySortBy on QueryBuilder<Contact, Contact, QSortBy> {
       return query.addSortBy(r'title', Sort.desc);
     });
   }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByTwitter() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'twitter', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByTwitterDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'twitter', Sort.desc);
+    });
+  }
 }
 
 extension ContactQuerySortThenBy
@@ -2784,6 +3430,19 @@ extension ContactQuerySortThenBy
     });
   }
 
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByFollowUpScheduledFor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'followUpScheduledFor', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy>
+      thenByFollowUpScheduledForDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'followUpScheduledFor', Sort.desc);
+    });
+  }
+
   QueryBuilder<Contact, Contact, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -2796,6 +3455,18 @@ extension ContactQuerySortThenBy
     });
   }
 
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByInstagram() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'instagram', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByInstagramDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'instagram', Sort.desc);
+    });
+  }
+
   QueryBuilder<Contact, Contact, QAfterSortBy> thenByIsEventMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isEventMode', Sort.asc);
@@ -2805,6 +3476,18 @@ extension ContactQuerySortThenBy
   QueryBuilder<Contact, Contact, QAfterSortBy> thenByIsEventModeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isEventMode', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByIsFollowUpCompleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFollowUpCompleted', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByIsFollowUpCompletedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFollowUpCompleted', Sort.desc);
     });
   }
 
@@ -2829,6 +3512,18 @@ extension ContactQuerySortThenBy
   QueryBuilder<Contact, Contact, QAfterSortBy> thenByLatitudeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'latitude', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByLinkedin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'linkedin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByLinkedinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'linkedin', Sort.desc);
     });
   }
 
@@ -2915,6 +3610,18 @@ extension ContactQuerySortThenBy
       return query.addSortBy(r'title', Sort.desc);
     });
   }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByTwitter() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'twitter', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByTwitterDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'twitter', Sort.desc);
+    });
+  }
 }
 
 extension ContactQueryWhereDistinct
@@ -2953,9 +3660,28 @@ extension ContactQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Contact, Contact, QDistinct> distinctByFollowUpScheduledFor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'followUpScheduledFor');
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QDistinct> distinctByInstagram(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'instagram', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Contact, Contact, QDistinct> distinctByIsEventMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isEventMode');
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QDistinct> distinctByIsFollowUpCompleted() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isFollowUpCompleted');
     });
   }
 
@@ -2968,6 +3694,13 @@ extension ContactQueryWhereDistinct
   QueryBuilder<Contact, Contact, QDistinct> distinctByLatitude() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'latitude');
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QDistinct> distinctByLinkedin(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'linkedin', caseSensitive: caseSensitive);
     });
   }
 
@@ -3024,6 +3757,13 @@ extension ContactQueryWhereDistinct
       return query.addDistinctBy(r'title', caseSensitive: caseSensitive);
     });
   }
+
+  QueryBuilder<Contact, Contact, QDistinct> distinctByTwitter(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'twitter', caseSensitive: caseSensitive);
+    });
+  }
 }
 
 extension ContactQueryProperty
@@ -3064,9 +3804,28 @@ extension ContactQueryProperty
     });
   }
 
+  QueryBuilder<Contact, DateTime?, QQueryOperations>
+      followUpScheduledForProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'followUpScheduledFor');
+    });
+  }
+
+  QueryBuilder<Contact, String?, QQueryOperations> instagramProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'instagram');
+    });
+  }
+
   QueryBuilder<Contact, bool, QQueryOperations> isEventModeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isEventMode');
+    });
+  }
+
+  QueryBuilder<Contact, bool, QQueryOperations> isFollowUpCompletedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isFollowUpCompleted');
     });
   }
 
@@ -3079,6 +3838,12 @@ extension ContactQueryProperty
   QueryBuilder<Contact, double?, QQueryOperations> latitudeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'latitude');
+    });
+  }
+
+  QueryBuilder<Contact, String?, QQueryOperations> linkedinProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'linkedin');
     });
   }
 
@@ -3127,6 +3892,12 @@ extension ContactQueryProperty
   QueryBuilder<Contact, String?, QQueryOperations> titleProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'title');
+    });
+  }
+
+  QueryBuilder<Contact, String?, QQueryOperations> twitterProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'twitter');
     });
   }
 }

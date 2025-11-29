@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart'; 
 import '../../../services/ai/cactus_service.dart';
+import '../../../services/location/location_service.dart';
 import 'scan_result_screen.dart';
 
 class ScanScreen extends StatefulWidget {
@@ -19,7 +21,6 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-open camera when screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _takePicture();
     });
@@ -30,13 +31,12 @@ class _ScanScreenState extends State<ScanScreen> {
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.rear,
-        imageQuality: 85, // Compress slightly for speed
+        imageQuality: 85,
       );
 
       if (photo != null) {
         await _processImage(photo.path);
       } else {
-        // User canceled, go back
         if (mounted) Navigator.pop(context);
       }
     } catch (e) {
@@ -47,34 +47,59 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _processImage(String path) async {
     setState(() {
       _isProcessing = true;
-      _statusMessage = "Reading text...";
+      _statusMessage = "Analyzing card & finding location...";
     });
 
     try {
-      // 1. Run Vision AI (OCR)
-      final rawText = await CactusService.instance.scanBusinessCard(path);
+      // --- PARALLEL EXECUTION ---
+      // We start both tasks at the same time to save seconds.
       
+      // Task 1: Run On-Device Vision AI (OCR)
+      final ocrFuture = CactusService.instance.scanBusinessCard(path);
+      
+      // Task 2: Get GPS Coordinates (Background)
+      final locationFuture = LocationService.instance.getCurrentLocation();
+
+      // Wait for both to finish
+      final results = await Future.wait([ocrFuture, locationFuture]);
+      
+      final rawText = results[0] as String;
+      final position = results[1] as Position?;
+
       if (mounted) {
         setState(() => _statusMessage = "Parsing contact info...");
       }
 
-      // 2. Run LLM (Parsing)
+      // Task 3: Parse Text with LLM
       final parsedData = await CactusService.instance.parseCardText(rawText);
+
+      // Task 4: Convert GPS to City Name (Using your Offline Geocoder)
+      String? addressLabel;
+      if (position != null) {
+        addressLabel = await LocationService.instance.getAddressLabel(
+          position.latitude, 
+          position.longitude
+        );
+      }
 
       if (!mounted) return;
 
-      // 3. Navigate to Result Screen
+      // Pass everything to the result screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => ScanResultScreen(
             initialData: parsedData,
             rawText: rawText,
+            // Pass the auto-captured location data
+            initialLatitude: position?.latitude,
+            initialLongitude: position?.longitude,
+            initialAddress: addressLabel,
           ),
         ),
       );
     } catch (e) {
-      _showError("AI Processing Error: $e");
+      _showError("Processing Error: $e");
     } finally {
       if (mounted) {
         setState(() => _isProcessing = false);
@@ -106,15 +131,11 @@ class _ScanScreenState extends State<ScanScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                "Running on-device AI...",
+                "Running on-device AI + GPS...",
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ] else
-              ElevatedButton.icon(
-                icon: const Icon(Icons.camera_alt),
-                label: const Text("Open Camera"),
-                onPressed: _takePicture,
-              ),
+              const Text("Opening Camera...", style: TextStyle(color: Colors.white)),
           ],
         ),
       ),

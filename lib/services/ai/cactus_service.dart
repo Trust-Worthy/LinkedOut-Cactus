@@ -1,3 +1,4 @@
+import 'dart:convert'; // Required for JSON parsing
 import 'dart:io';
 import 'package:cactus/cactus.dart';
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,9 @@ import 'package:logger/logger.dart';
 
 class CactusService {
   final Logger _logger = Logger();
+  
+  // We use two separate instances if we want to hold different models, 
+  // but for the Hackathon, swapping one model is safer for memory.
   final CactusLM _lm = CactusLM();
   
   // Singleton Pattern
@@ -30,23 +34,36 @@ class CactusService {
     required Function(double progress, String status) onProgress,
   }) async {
     try {
-      // 0. Setup Telemetry (Required for some SDK versions)
+      // 0. Setup Telemetry
       CactusTelemetry.setTelemetryToken('a83c7f7a-43ad-4823-b012-cbeb587ae788');
 
       onProgress(0.0, "Fetching model list...");
       
-      // 1. Get available models
+      // 1. Get available models and LOG THEM
       final models = await _lm.getModels();
       
-      // 2. Select a model that supports VISION (Critical for LinkedOut)
-      // If no vision model found, fallback to the first available (Text only)
+      _logger.i("=== AVAILABLE MODELS ===");
+      for (var model in models) {
+        _logger.i("Model: ${model.slug}");
+        _logger.i("  - Vision: ${model.supportsVision}");
+        _logger.i("  - Downloaded: ${model.isDownloaded}");
+        _logger.i("  - Size: ${model.sizeMb} MB");
+        _logger.i("---");
+      }
+      _logger.i("========================");
+      
+      // 2. Select a model strategy
+      // Priority: Specific "liquid" vision model -> Any Vision model -> First available
       final selectedModel = models.firstWhere(
-        (m) => m.supportsVision, 
-        orElse: () => models.first
+        (m) => m.slug.contains('liquid') && m.supportsVision,
+        orElse: () => models.firstWhere(
+          (m) => m.supportsVision,
+          orElse: () => models.first,
+        ),
       );
       
       currentModelSlug = selectedModel.slug;
-      _logger.i("Selected model: $currentModelSlug (Vision: ${selectedModel.supportsVision})");
+      _logger.i("✅ Selected Model: $currentModelSlug");
 
       // 3. Check if already downloaded
       if (selectedModel.isDownloaded) {
@@ -86,6 +103,7 @@ class CactusService {
       // If we don't have a slug yet, try to find one or let Cactus use default
       if (currentModelSlug == null) {
          final models = await _lm.getModels();
+         // Try to find a vision model if we haven't selected one
          final visionModel = models.firstWhere((m) => m.supportsVision, orElse: () => models.first);
          currentModelSlug = visionModel.slug;
       }
@@ -145,7 +163,7 @@ class CactusService {
     
     const prompt = """
     Parse the following text from a business card into a JSON object with these keys: 
-    name, company, title, email, phone, notes. 
+    name, company, title, email, phone, notes, linkedin. 
     If a field is not found, return null. 
     Do not add markdown formatting. Return only JSON.
     
@@ -160,7 +178,7 @@ class CactusService {
     );
 
     if (result.success) {
-      return _mockParseJson(result.response); 
+      return _parseJsonFromResponse(result.response); 
     }
     throw Exception("Parsing failed");
   }
@@ -197,17 +215,47 @@ class CactusService {
   
   // --- Helpers & Cleanup ---
 
-  // Hacky helper to avoid writing a full JSON parser in the prompt response for now
-  Map<String, String?> _mockParseJson(String llmOutput) {
-     // TODO: Implement actual JSON cleaning (remove ```json) and decoding
-     // For the hackathon MVP, we return a mock map to prevent UI crashes if the LLM output is messy
-     // In the next step, we can add `dart:convert` and `jsonDecode` here.
-     return {
-       "name": "Parsed Name", 
-       "company": "Parsed Company",
-       "email": "email@example.com",
-       "title": "Developer"
-     };
+  // Real JSON Parser (Replaces Mock)
+  Map<String, String?> _parseJsonFromResponse(String llmOutput) {
+    try {
+      _logger.d("Raw LLM Output: $llmOutput");
+      
+      // 1. Clean the response (Remove markdown ```json ... ```)
+      String cleaned = llmOutput.trim();
+      cleaned = cleaned.replaceAll(RegExp(r'```json\s*'), '');
+      cleaned = cleaned.replaceAll(RegExp(r'```\s*'), '');
+      
+      // 2. Find JSON object boundaries
+      final firstBrace = cleaned.indexOf('{');
+      final lastBrace = cleaned.lastIndexOf('}');
+      
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      }
+      
+      // 3. Parse JSON
+      final Map<String, dynamic> parsed = jsonDecode(cleaned);
+      
+      // 4. Convert to String map safely
+      return {
+        'name': parsed['name']?.toString(),
+        'company': parsed['company']?.toString(),
+        'email': parsed['email']?.toString(),
+        'phone': parsed['phone']?.toString(),
+        'title': parsed['title']?.toString(),
+        'linkedin': parsed['linkedin']?.toString(),
+        'notes': parsed['notes']?.toString(),
+      };
+      
+    } catch (e) {
+      _logger.e("JSON parsing failed: $e");
+      // Fallback: return raw text in notes if parsing fails
+      return {
+        'name': null,
+        'company': null,
+        'notes': "Raw Text (Parse Failed): $llmOutput"
+      };
+    }
   }
 
   void dispose() {

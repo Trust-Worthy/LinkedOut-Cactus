@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
 import '../../widgets/contact/contact_card.dart';
-import '../scan/scan_screen.dart'; // We will create this next
-// import '../map/map_screen.dart';   // We will create this later
+import '../scan/scan_screen.dart';
+import '../chat/chat_screen.dart';
+import '../timeline/timeline_screen.dart';
+import '../scan/scan_result_screen.dart'; // Import reused screen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,9 +16,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-  List<Contact> _contacts = [];
+  int _selectedIndex = 1; // Default to Middle (Contacts)
+  
+  // Contacts Data
+  List<Contact> _allContacts = [];
+  List<Contact> _filteredContacts = []; // For search
   bool _isLoading = true;
+  
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -24,137 +31,182 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadContacts();
   }
 
-  // Fetch contacts from the database
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadContacts() async {
     setState(() => _isLoading = true);
     try {
       final repo = Provider.of<ContactRepository>(context, listen: false);
       final contacts = await repo.getAllContacts();
       setState(() {
-        _contacts = contacts;
+        _allContacts = contacts;
+        _filteredContacts = contacts; // Initially show all
         _isLoading = false;
       });
+      // Re-apply search if text exists
+      if (_searchController.text.isNotEmpty) {
+        _filterContacts(_searchController.text);
+      }
     } catch (e) {
-      debugPrint("Error loading contacts: $e");
       setState(() => _isLoading = false);
     }
   }
 
-  // void _onFabPressed() {
-  //   // Navigate to Scan Screen
-  //   // Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanScreen()))
-  //   //     .then((_) => _loadContacts()); // Reload list when returning
-    
-  //   // TEMPORARY: Add a dummy contact so you can see the list work immediately
-  //   _addDummyContact();
-  // }
+  void _filterContacts(String query) {
+    if (query.isEmpty) {
+      setState(() => _filteredContacts = _allContacts);
+      return;
+    }
 
-  void _onFabPressed() {
+    final lowerQuery = query.toLowerCase();
+    setState(() {
+      _filteredContacts = _allContacts.where((c) {
+        final name = c.name.toLowerCase();
+        final company = (c.company ?? "").toLowerCase();
+        final title = (c.title ?? "").toLowerCase();
+        return name.contains(lowerQuery) || 
+               company.contains(lowerQuery) || 
+               title.contains(lowerQuery);
+      }).toList();
+    });
+  }
+
+  void _onScanPressed() {
     Navigator.push(
       context, 
       MaterialPageRoute(builder: (_) => const ScanScreen())
-    ).then((_) {
-      // Refresh list when returning from scan
-      _loadContacts(); 
-    });
+    ).then((_) => _loadContacts());
   }
-  
-  // Helper for testing without the scanner
-  Future<void> _addDummyContact() async {
-    final repo = Provider.of<ContactRepository>(context, listen: false);
-    final dummy = Contact(
-      name: "Test User ${_contacts.length + 1}",
-      company: "Cactus AI",
-      title: "Engineer",
-      metAt: DateTime.now(),
-      addressLabel: "Hackathon Venue",
-    );
-    await repo.saveContact(dummy);
-    _loadContacts(); // Refresh UI
+
+  void _onManualAddPressed() {
+    // Navigate to ScanResultScreen with empty data to act as "Add New"
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ScanResultScreen(
+          initialData: {}, 
+          rawText: "", // No OCR text
+          // You could pass current location here if you wanted, 
+          // or let the screen fetch it if you implement logic there.
+        ),
+      ),
+    ).then((_) => _loadContacts()); // Refresh list on return
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          "LinkedOut",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
         backgroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              // TODO: Open Settings
-            },
+        titleSpacing: 0,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.grey.shade300,
+            child: const Icon(Icons.person, color: Colors.white),
           ),
-        ],
+        ),
+        title: Row(
+          children: [
+            // Plus button to the LEFT of search bar
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: Colors.black),
+              onPressed: _onManualAddPressed,
+            ),
+            // Search Bar
+            Expanded(
+              child: Container(
+                height: 40,
+                margin: const EdgeInsets.only(right: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _filterContacts,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search, color: Colors.grey),
+                    hintText: "Search contacts...",
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8), // Centers text vertically
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _contacts.isEmpty
-              ? _buildEmptyState()
-              : _buildContactList(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _onFabPressed,
-        backgroundColor: Colors.black,
-        icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-        label: const Text("Scan Card", style: TextStyle(color: Colors.white)),
-      ),
+      
+      body: _buildBody(),
+      
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
+        selectedItemColor: Colors.black,
+        unselectedItemColor: Colors.grey,
         onTap: (index) {
-          setState(() => _selectedIndex = index);
-          // Handle navigation logic here later
+          if (index == 1) {
+            _onScanPressed(); // Middle button opens Scanner
+          } else {
+            setState(() => _selectedIndex = index);
+          }
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.list), label: "Network"),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: "Map"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            label: "Chat AI",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.qr_code_scanner),
+            label: "Scan",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: "Timeline",
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildContactList() {
-    return Column(
-      children: [
-        // Search Bar (Visual Only for MVP Phase 1)
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: "Search your network...",
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            ),
-          ),
-        ),
-        
-        // List
-        Expanded(
-          child: ListView.builder(
-            itemCount: _contacts.length,
-            padding: const EdgeInsets.only(bottom: 80), // Space for FAB
-            itemBuilder: (context, index) {
-              return ContactCard(
-                contact: _contacts[index],
-                onTap: () {
-                  // TODO: Open Detail Screen
-                },
-              );
-            },
-          ),
-        ),
-      ],
+  Widget _buildBody() {
+    if (_selectedIndex == 0) {
+      return const ChatScreen();
+    } else if (_selectedIndex == 2) {
+      return const TimelineScreen();
+    }
+    
+    // Default View: Contact List (Filtered)
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_allContacts.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    if (_filteredContacts.isEmpty) {
+      return const Center(child: Text("No contacts match your search."));
+    }
+
+    return ListView.builder(
+      itemCount: _filteredContacts.length,
+      padding: const EdgeInsets.all(8),
+      itemBuilder: (context, index) {
+        return ContactCard(
+          contact: _filteredContacts[index],
+          onTap: () {
+            // TODO: Open Detail Screen
+          },
+        );
+      },
     );
   }
 
@@ -171,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            "Scan a business card to get started",
+            "Scan a card or tap + to add manually",
             style: TextStyle(color: Colors.grey),
           ),
         ],

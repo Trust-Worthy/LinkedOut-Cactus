@@ -2,17 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
-import '../../../services/ai/cactus_service.dart';
-import '../../../services/location/location_service.dart'; // Add this import
 
 class ScanResultScreen extends StatefulWidget {
   final Map<String, String?> initialData;
   final String rawText;
+  
+  // New Fields for Location
+  final double? initialLatitude;
+  final double? initialLongitude;
+  final String? initialAddress;
 
   const ScanResultScreen({
     super.key,
     required this.initialData,
     required this.rawText,
+    this.initialLatitude,
+    this.initialLongitude,
+    this.initialAddress,
   });
 
   @override
@@ -27,6 +33,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   late TextEditingController _titleController;
   late TextEditingController _emailController;
   late TextEditingController _notesController;
+  late TextEditingController _locationController; // New Controller
 
   bool _isSaving = false;
 
@@ -37,8 +44,10 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     _companyController = TextEditingController(text: widget.initialData['company'] ?? '');
     _titleController = TextEditingController(text: widget.initialData['title'] ?? '');
     _emailController = TextEditingController(text: widget.initialData['email'] ?? '');
-    // Pre-fill notes with any raw text that might be useful, or leave empty
     _notesController = TextEditingController(text: widget.initialData['notes'] ?? '');
+    
+    // Pre-fill location
+    _locationController = TextEditingController(text: widget.initialAddress ?? '');
   }
 
   Future<void> _saveContact() async {
@@ -47,25 +56,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     setState(() => _isSaving = true);
 
     try {
-      // 1. Capture Location
-      double? lat;
-      double? lng;
-      String? address = "Scanned Location";
-
-      try {
-        final position = await LocationService.instance.getCurrentLocation();
-        if (position != null) {
-          lat = position.latitude;
-          lng = position.longitude;
-          
-          // Get readable name
-          final label = await LocationService.instance.getAddressLabel(lat, lng);
-          if (label != null) address = label;
-        }
-      } catch (e) {
-        print("Location error: $e"); // Fail silently, save contact anyway
-      }
-
       final contact = Contact(
         name: _nameController.text,
         company: _companyController.text,
@@ -75,10 +65,10 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         metAt: DateTime.now(),
         rawScannedText: widget.rawText,
         
-        // 2. Save Location Data
-        latitude: lat,
-        longitude: lng,
-        addressLabel: address, 
+        // Use the passed-in coordinates directly
+        latitude: widget.initialLatitude,
+        longitude: widget.initialLongitude,
+        addressLabel: _locationController.text, 
       );
 
       await Provider.of<ContactRepository>(context, listen: false).saveContact(contact);
@@ -93,38 +83,6 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     }
   }
 
-  // Future<void> _saveContact() async {
-  //   if (!_formKey.currentState!.validate()) return;
-
-  //   setState(() => _isSaving = true);
-
-  //   try {
-  //     final contact = Contact(
-  //       name: _nameController.text,
-  //       company: _companyController.text,
-  //       title: _titleController.text,
-  //       email: _emailController.text,
-  //       notes: _notesController.text,
-  //       metAt: DateTime.now(),
-  //       rawScannedText: widget.rawText,
-  //       // TODO: Get actual location here in next step
-  //       addressLabel: "Scanned Location", 
-  //     );
-
-  //     // This will automatically generate the embedding via our Repo logic!
-  //     await Provider.of<ContactRepository>(context, listen: false).saveContact(contact);
-
-  //     if (mounted) {
-  //       // Go back to Home (pop twice: ScanScreen and ResultScreen)
-  //       Navigator.pop(context); 
-  //     }
-  //   } catch (e) {
-  //     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-  //   } finally {
-  //     if (mounted) setState(() => _isSaving = false);
-  //   }
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -135,7 +93,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             const Text(
-              "AI extracted the following details. Please verify.",
+              "AI extracted details. Location captured automatically.",
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 20),
@@ -144,6 +102,11 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
             _buildField("Company", _companyController),
             _buildField("Job Title", _titleController),
             _buildField("Email", _emailController, keyboardType: TextInputType.emailAddress),
+            
+            // Location Field (Editable)
+            _buildField("Met At", _locationController, 
+              suffixIcon: const Icon(Icons.location_on, color: Colors.green)),
+              
             _buildField("Notes", _notesController, maxLines: 3),
 
             const SizedBox(height: 30),
@@ -167,7 +130,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   Widget _buildField(
     String label, 
     TextEditingController controller, 
-    {bool isRequired = false, int maxLines = 1, TextInputType? keyboardType}
+    {bool isRequired = false, int maxLines = 1, TextInputType? keyboardType, Widget? suffixIcon}
   ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -178,6 +141,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
+          suffixIcon: suffixIcon,
         ),
         validator: isRequired 
           ? (v) => v == null || v.isEmpty ? "$label is required" : null 

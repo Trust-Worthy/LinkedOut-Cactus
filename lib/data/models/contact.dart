@@ -1,6 +1,5 @@
 import 'package:isar/isar.dart';
 
-// This line allows the code generator to build the helper file
 part 'contact.g.dart';
 
 @collection
@@ -16,29 +15,36 @@ class Contact {
   String? email;
   String? phone;
   
+  // --- Socials ---
+  String? linkedin;
+  String? instagram;
+  String? twitter;
+  
   // --- Contextual Data ---
   String? notes;
   List<String>? tags;
   
-  // --- Spatial Data (Where you met) ---
+  // --- Spatial Data ---
   double? latitude;
   double? longitude;
-  String? addressLabel; // e.g. "Willings House, London"
+  String? addressLabel; // "Denver, CO"
   
-  // --- Temporal Data (When you met) ---
+  // --- Temporal Data ---
   late DateTime metAt;
   late DateTime lastInteractedAt;
   
   // --- Event Mode ---
-  String? eventName; // e.g. "Cactus Hackathon"
+  String? eventName; // "Cactus Hackathon"
   bool isEventMode;
 
+  // --- Follow Up ---
+  DateTime? followUpScheduledFor;
+  bool isFollowUpCompleted;
+
   // --- AI Semantic Data ---
-  // We store the vector embedding here for search
   List<double>? embedding;
 
   // --- Metadata ---
-  // Store the raw OCR text in case we want to re-parse later
   String? rawScannedText; 
 
   Contact({
@@ -48,6 +54,9 @@ class Contact {
     this.title,
     this.email,
     this.phone,
+    this.linkedin,
+    this.instagram,
+    this.twitter,
     this.notes,
     this.tags,
     this.latitude,
@@ -55,6 +64,8 @@ class Contact {
     this.addressLabel,
     this.eventName,
     this.isEventMode = false,
+    this.followUpScheduledFor,
+    this.isFollowUpCompleted = false,
     this.embedding,
     this.rawScannedText,
   }) : lastInteractedAt = DateTime.now();
