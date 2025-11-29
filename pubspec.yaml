@@ -73,3 +73,10 @@ flutter:
     # Images
     - assets/LinkedOut.svg
     - assets/LinkedOut.png
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/LinkedOut.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/LinkedOut.png"
