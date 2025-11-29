@@ -62,63 +62,68 @@ const ContactSchema = CollectionSchema(
       name: r'isFollowUpCompleted',
       type: IsarType.bool,
     ),
-    r'lastInteractedAt': PropertySchema(
+    r'isMe': PropertySchema(
       id: 9,
+      name: r'isMe',
+      type: IsarType.bool,
+    ),
+    r'lastInteractedAt': PropertySchema(
+      id: 10,
       name: r'lastInteractedAt',
       type: IsarType.dateTime,
     ),
     r'latitude': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'latitude',
       type: IsarType.double,
     ),
     r'linkedin': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'linkedin',
       type: IsarType.string,
     ),
     r'longitude': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'longitude',
       type: IsarType.double,
     ),
     r'metAt': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'metAt',
       type: IsarType.dateTime,
     ),
     r'name': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'name',
       type: IsarType.string,
     ),
     r'notes': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'notes',
       type: IsarType.string,
     ),
     r'phone': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'phone',
       type: IsarType.string,
     ),
     r'rawScannedText': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'rawScannedText',
       type: IsarType.string,
     ),
     r'tags': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'tags',
       type: IsarType.stringList,
     ),
     r'title': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'title',
       type: IsarType.string,
     ),
     r'twitter': PropertySchema(
-      id: 20,
+      id: 21,
       name: r'twitter',
       type: IsarType.string,
     )
@@ -260,18 +265,19 @@ void _contactSerialize(
   writer.writeString(offsets[6], object.instagram);
   writer.writeBool(offsets[7], object.isEventMode);
   writer.writeBool(offsets[8], object.isFollowUpCompleted);
-  writer.writeDateTime(offsets[9], object.lastInteractedAt);
-  writer.writeDouble(offsets[10], object.latitude);
-  writer.writeString(offsets[11], object.linkedin);
-  writer.writeDouble(offsets[12], object.longitude);
-  writer.writeDateTime(offsets[13], object.metAt);
-  writer.writeString(offsets[14], object.name);
-  writer.writeString(offsets[15], object.notes);
-  writer.writeString(offsets[16], object.phone);
-  writer.writeString(offsets[17], object.rawScannedText);
-  writer.writeStringList(offsets[18], object.tags);
-  writer.writeString(offsets[19], object.title);
-  writer.writeString(offsets[20], object.twitter);
+  writer.writeBool(offsets[9], object.isMe);
+  writer.writeDateTime(offsets[10], object.lastInteractedAt);
+  writer.writeDouble(offsets[11], object.latitude);
+  writer.writeString(offsets[12], object.linkedin);
+  writer.writeDouble(offsets[13], object.longitude);
+  writer.writeDateTime(offsets[14], object.metAt);
+  writer.writeString(offsets[15], object.name);
+  writer.writeString(offsets[16], object.notes);
+  writer.writeString(offsets[17], object.phone);
+  writer.writeString(offsets[18], object.rawScannedText);
+  writer.writeStringList(offsets[19], object.tags);
+  writer.writeString(offsets[20], object.title);
+  writer.writeString(offsets[21], object.twitter);
 }
 
 Contact _contactDeserialize(
@@ -290,20 +296,21 @@ Contact _contactDeserialize(
     instagram: reader.readStringOrNull(offsets[6]),
     isEventMode: reader.readBoolOrNull(offsets[7]) ?? false,
     isFollowUpCompleted: reader.readBoolOrNull(offsets[8]) ?? false,
-    latitude: reader.readDoubleOrNull(offsets[10]),
-    linkedin: reader.readStringOrNull(offsets[11]),
-    longitude: reader.readDoubleOrNull(offsets[12]),
-    metAt: reader.readDateTime(offsets[13]),
-    name: reader.readString(offsets[14]),
-    notes: reader.readStringOrNull(offsets[15]),
-    phone: reader.readStringOrNull(offsets[16]),
-    rawScannedText: reader.readStringOrNull(offsets[17]),
-    tags: reader.readStringList(offsets[18]),
-    title: reader.readStringOrNull(offsets[19]),
-    twitter: reader.readStringOrNull(offsets[20]),
+    isMe: reader.readBoolOrNull(offsets[9]) ?? false,
+    latitude: reader.readDoubleOrNull(offsets[11]),
+    linkedin: reader.readStringOrNull(offsets[12]),
+    longitude: reader.readDoubleOrNull(offsets[13]),
+    metAt: reader.readDateTime(offsets[14]),
+    name: reader.readString(offsets[15]),
+    notes: reader.readStringOrNull(offsets[16]),
+    phone: reader.readStringOrNull(offsets[17]),
+    rawScannedText: reader.readStringOrNull(offsets[18]),
+    tags: reader.readStringList(offsets[19]),
+    title: reader.readStringOrNull(offsets[20]),
+    twitter: reader.readStringOrNull(offsets[21]),
   );
   object.id = id;
-  object.lastInteractedAt = reader.readDateTime(offsets[9]);
+  object.lastInteractedAt = reader.readDateTime(offsets[10]);
   return object;
 }
 
@@ -333,28 +340,30 @@ P _contactDeserializeProp<P>(
     case 8:
       return (reader.readBoolOrNull(offset) ?? false) as P;
     case 9:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readBoolOrNull(offset) ?? false) as P;
     case 10:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 11:
-      return (reader.readStringOrNull(offset)) as P;
-    case 12:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 13:
       return (reader.readDateTime(offset)) as P;
-    case 14:
-      return (reader.readString(offset)) as P;
-    case 15:
+    case 11:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 12:
       return (reader.readStringOrNull(offset)) as P;
+    case 13:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 14:
+      return (reader.readDateTime(offset)) as P;
+    case 15:
+      return (reader.readString(offset)) as P;
     case 16:
       return (reader.readStringOrNull(offset)) as P;
     case 17:
       return (reader.readStringOrNull(offset)) as P;
     case 18:
-      return (reader.readStringList(offset)) as P;
-    case 19:
       return (reader.readStringOrNull(offset)) as P;
+    case 19:
+      return (reader.readStringList(offset)) as P;
     case 20:
+      return (reader.readStringOrNull(offset)) as P;
+    case 21:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1631,6 +1640,16 @@ extension ContactQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'isFollowUpCompleted',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterFilterCondition> isMeEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isMe',
         value: value,
       ));
     });
@@ -3247,6 +3266,18 @@ extension ContactQuerySortBy on QueryBuilder<Contact, Contact, QSortBy> {
     });
   }
 
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByIsMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isMe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> sortByIsMeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isMe', Sort.desc);
+    });
+  }
+
   QueryBuilder<Contact, Contact, QAfterSortBy> sortByLastInteractedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastInteractedAt', Sort.asc);
@@ -3491,6 +3522,18 @@ extension ContactQuerySortThenBy
     });
   }
 
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByIsMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isMe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Contact, Contact, QAfterSortBy> thenByIsMeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isMe', Sort.desc);
+    });
+  }
+
   QueryBuilder<Contact, Contact, QAfterSortBy> thenByLastInteractedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastInteractedAt', Sort.asc);
@@ -3685,6 +3728,12 @@ extension ContactQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Contact, Contact, QDistinct> distinctByIsMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isMe');
+    });
+  }
+
   QueryBuilder<Contact, Contact, QDistinct> distinctByLastInteractedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastInteractedAt');
@@ -3826,6 +3875,12 @@ extension ContactQueryProperty
   QueryBuilder<Contact, bool, QQueryOperations> isFollowUpCompletedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isFollowUpCompleted');
+    });
+  }
+
+  QueryBuilder<Contact, bool, QQueryOperations> isMeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isMe');
     });
   }
 

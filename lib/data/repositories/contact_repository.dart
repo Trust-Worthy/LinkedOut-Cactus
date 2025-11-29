@@ -9,14 +9,32 @@ class ContactRepository {
 
   ContactRepository(this._isarService);
 
+  // --- User Profile Methods (NEW) ---
+
+  /// Gets the user's profile. Returns null if not set up yet.
+  Future<Contact?> getUserProfile() async {
+    final isar = await _isarService.db;
+    return await isar.contacts.filter().isMeEqualTo(true).findFirst();
+  }
+
+  /// Saves the user profile and generates its embedding context
+  Future<void> saveUserProfile(Contact profile) async {
+    profile.isMe = true; // Enforce this flag
+    await saveContact(profile); 
+  }
+
+  // --- Existing Methods ---
+
   Future<void> saveContact(Contact contact) async {
     final isar = await _isarService.db;
 
-    final String textToEmbed = _buildContactText(contact);
+    // Build context string including "MY PROFILE" tag if it's the user
+    String textToEmbed = _buildContactText(contact);
+    if (contact.isMe) {
+      textToEmbed = "MY USER PROFILE (ME): $textToEmbed";
+    }
 
     try {
-      // Only generate if not already present or if you want to force update
-      // For now, we always generate to ensure freshness
       final embedding = await CactusService.instance.getEmbedding(textToEmbed);
       if (embedding.isNotEmpty) {
         contact.embedding = embedding;
@@ -30,7 +48,27 @@ class ContactRepository {
     });
   }
 
-  /// REGENERATION LOGIC: Call this to fix incompatible embeddings
+  // UPDATED: Filter out the user's own profile from the main list
+  Future<List<Contact>> getAllContacts() async {
+    final isar = await _isarService.db;
+    return await isar.contacts
+        .filter()
+        .isMeEqualTo(false) // Don't show "Me" in the main list
+        .sortByMetAtDesc()
+        .findAll();
+  }
+  
+  String _buildContactText(Contact contact) {
+    return """
+      Name: ${contact.name}
+      Company: ${contact.company ?? ''}
+      Title: ${contact.title ?? ''}
+      Notes: ${contact.notes ?? ''}
+      Location: ${contact.addressLabel ?? ''}
+      Event: ${contact.eventName ?? ''}
+    """.trim();
+  }
+  
   Future<void> regenerateAllEmbeddings() async {
     final isar = await _isarService.db;
     final allContacts = await isar.contacts.where().findAll();
@@ -45,7 +83,7 @@ class ContactRepository {
           
           if (embedding.isNotEmpty) {
             contact.embedding = embedding;
-            await isar.contacts.put(contact); // Update existing record
+            await isar.contacts.put(contact); 
             debugPrint('✅ Updated embedding for ${contact.name}');
           } else {
             debugPrint('⚠️ Empty embedding generated for ${contact.name}');
@@ -57,24 +95,7 @@ class ContactRepository {
     });
     debugPrint('✨ Done! All embeddings regenerated.');
   }
-
-  String _buildContactText(Contact contact) {
-    return """
-      Name: ${contact.name}
-      Company: ${contact.company ?? ''}
-      Title: ${contact.title ?? ''}
-      Notes: ${contact.notes ?? ''}
-      Location: ${contact.addressLabel ?? ''}
-      Event: ${contact.eventName ?? ''}
-      Tags: ${contact.tags?.join(', ') ?? ''}
-    """.trim();
-  }
-
-  Future<List<Contact>> getAllContacts() async {
-    final isar = await _isarService.db;
-    return await isar.contacts.where().sortByMetAtDesc().findAll();
-  }
-
+  
   Future<void> deleteContact(int id) async {
     final isar = await _isarService.db;
     await isar.writeTxn(() async {

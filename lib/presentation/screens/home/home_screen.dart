@@ -11,7 +11,6 @@ import '../scan/scan_result_screen.dart';
 import '../chat/chat_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../contact/contact_detail_screen.dart';
-// FIX: Import Profile Screen
 import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,7 +23,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   
-  // Data State
   List<Contact> _allContacts = [];
   List<Contact> _filteredContacts = [];
   bool _isLoading = true;
@@ -41,9 +39,10 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
     try {
       final repo = Provider.of<ContactRepository>(context, listen: false);
+      // The repository now handles filtering out "isMe" contacts in getAllContacts()
+      // But just in case, we can double check here or rely on the repo update.
       final contacts = await repo.getAllContacts();
       
-      // Sort alphabetically for the grouped list view
       contacts.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
       setState(() {
@@ -56,7 +55,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Uses the SmartSearchService (Router Agent)
   Future<void> _handleSearch(String query) async {
     if (query.isEmpty) {
       setState(() => _filteredContacts = _allContacts);
@@ -68,7 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final results = await searchService.search(query);
       setState(() => _filteredContacts = results);
     } catch (e) {
-      // Fallback to local filter if service fails
       setState(() {
         _filteredContacts = _allContacts.where((c) => 
           c.name.toLowerCase().contains(query.toLowerCase()) || 
@@ -86,7 +83,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onManualAddPressed() {
-    // Reusing the ScanResultScreen for manual entry
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -101,10 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Friend's Dark Theme
+      backgroundColor: Colors.black, 
       body: GestureDetector(
         onHorizontalDragEnd: (details) {
-          // Swipe right to open scanner (Friend's feature)
           if (details.primaryVelocity! > 0) {
             _onScanPressed();
           }
@@ -120,11 +115,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Profile Button
                     GestureDetector(
                       onTap: () {
-                        // FIX: Navigate to Profile Screen
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const ProfileScreen())
-                        );
+                        ).then((_) {
+                          // Optionally reload if profile changes affect UI state
+                        });
                       },
                       child: CircleAvatar(
                         radius: 20,
@@ -168,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 40,
                         height: 40,
                         decoration: const BoxDecoration(
-                          color: Colors.blue, // Friend's accent color
+                          color: Colors.blue, 
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.add, color: Colors.white, size: 24),
@@ -196,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedItemColor: Colors.grey[600],
         onTap: (index) {
           if (index == 2) {
-            _onScanPressed(); // Middle action
+            _onScanPressed(); 
           } else {
             setState(() => _selectedIndex = index);
           }
@@ -211,7 +207,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Switches between the main views based on the Bottom Nav
   Widget _buildBody() {
     if (_selectedIndex == 1) return const ChatScreen();
     if (_selectedIndex == 3) return const TimelineScreen();
@@ -221,7 +216,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContactList() {
-    // Header Stats
     return Column(
       children: [
         Padding(
@@ -241,7 +235,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         
-        // The List
         Expanded(
           child: _isLoading 
             ? const Center(child: CircularProgressIndicator(color: Colors.blue))
@@ -253,7 +246,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       final contact = _filteredContacts[index];
                       
-                      // Logic for Section Headers (A, B, C...)
                       bool showSection = index == 0;
                       if (index > 0) {
                         final prevName = _filteredContacts[index - 1].name;
@@ -270,7 +262,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Friend's "Tile" Design adapted for Real Data
   Widget _buildContactTile(Contact contact, bool showSection, bool isLast) {
     String initials = contact.name.isNotEmpty ? contact.name[0].toUpperCase() : "?";
     

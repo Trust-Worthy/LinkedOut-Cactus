@@ -6,6 +6,10 @@ part 'contact.g.dart';
 class Contact {
   Id id = Isar.autoIncrement;
 
+  // --- Identity Flag ---
+  // If true, this is the User's own profile
+  bool isMe; 
+
   // --- Basic Info ---
   @Index(type: IndexType.value, caseSensitive: false)
   late String name;
@@ -27,14 +31,14 @@ class Contact {
   // --- Spatial Data ---
   double? latitude;
   double? longitude;
-  String? addressLabel; // "Denver, CO"
+  String? addressLabel;
   
   // --- Temporal Data ---
   late DateTime metAt;
   late DateTime lastInteractedAt;
   
   // --- Event Mode ---
-  String? eventName; // "Cactus Hackathon"
+  String? eventName;
   bool isEventMode;
 
   // --- Follow Up ---
@@ -50,6 +54,7 @@ class Contact {
   Contact({
     required this.name,
     required this.metAt,
+    this.isMe = false, // <--- FIX: Added this to constructor
     this.company,
     this.title,
     this.email,
