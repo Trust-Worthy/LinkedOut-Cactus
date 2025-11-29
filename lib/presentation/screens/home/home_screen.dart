@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart'; // Ensure you have this dependency or remove if not using SVG here specifically
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
-import '../../widgets/contact/contact_card.dart';
+import '../../../services/search/smart_search_service.dart';
+
+// Screens
 import '../scan/scan_screen.dart';
+import '../scan/scan_result_screen.dart';
 import '../chat/chat_screen.dart';
 import '../timeline/timeline_screen.dart';
-import '../scan/scan_result_screen.dart'; // Import reused screen
+// Note: We are using the screens we already built. 
+// If you want to use his specific ProfileScreen, import it here.
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,11 +21,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 1; // Default to Middle (Contacts)
+  int _selectedIndex = 0;
   
-  // Contacts Data
+  // Data State
   List<Contact> _allContacts = [];
-  List<Contact> _filteredContacts = []; // For search
+  List<Contact> _filteredContacts = [];
   bool _isLoading = true;
   
   final TextEditingController _searchController = TextEditingController();
@@ -31,48 +36,45 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadContacts();
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadContacts() async {
     setState(() => _isLoading = true);
     try {
       final repo = Provider.of<ContactRepository>(context, listen: false);
       final contacts = await repo.getAllContacts();
+      
+      // Sort alphabetically for the grouped list view
+      contacts.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
       setState(() {
         _allContacts = contacts;
-        _filteredContacts = contacts; // Initially show all
+        _filteredContacts = contacts;
         _isLoading = false;
       });
-      // Re-apply search if text exists
-      if (_searchController.text.isNotEmpty) {
-        _filterContacts(_searchController.text);
-      }
     } catch (e) {
       setState(() => _isLoading = false);
     }
   }
 
-  void _filterContacts(String query) {
+  // Uses the SmartSearchService (Router Agent) we built earlier
+  Future<void> _handleSearch(String query) async {
     if (query.isEmpty) {
       setState(() => _filteredContacts = _allContacts);
       return;
     }
 
-    final lowerQuery = query.toLowerCase();
-    setState(() {
-      _filteredContacts = _allContacts.where((c) {
-        final name = c.name.toLowerCase();
-        final company = (c.company ?? "").toLowerCase();
-        final title = (c.title ?? "").toLowerCase();
-        return name.contains(lowerQuery) || 
-               company.contains(lowerQuery) || 
-               title.contains(lowerQuery);
-      }).toList();
-    });
+    try {
+      final searchService = Provider.of<SmartSearchService>(context, listen: false);
+      final results = await searchService.search(query);
+      setState(() => _filteredContacts = results);
+    } catch (e) {
+      // Fallback to local filter if service fails
+      setState(() {
+        _filteredContacts = _allContacts.where((c) => 
+          c.name.toLowerCase().contains(query.toLowerCase()) || 
+          (c.company?.toLowerCase().contains(query.toLowerCase()) ?? false)
+        ).toList();
+      });
+    }
   }
 
   void _onScanPressed() {
@@ -83,130 +85,276 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onManualAddPressed() {
-    // Navigate to ScanResultScreen with empty data to act as "Add New"
+    // Reusing the ScanResultScreen for manual entry guarantees Embeddings are generated
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => const ScanResultScreen(
           initialData: {}, 
-          rawText: "", // No OCR text
-          // You could pass current location here if you wanted, 
-          // or let the screen fetch it if you implement logic there.
+          rawText: "",
         ),
       ),
-    ).then((_) => _loadContacts()); // Refresh list on return
+    ).then((_) => _loadContacts());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        titleSpacing: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: Colors.grey.shade300,
-            child: const Icon(Icons.person, color: Colors.white),
-          ),
-        ),
-        title: Row(
-          children: [
-            // Plus button to the LEFT of search bar
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: Colors.black),
-              onPressed: _onManualAddPressed,
-            ),
-            // Search Bar
-            Expanded(
-              child: Container(
-                height: 40,
-                margin: const EdgeInsets.only(right: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: _filterContacts,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search, color: Colors.grey),
-                    hintText: "Search contacts...",
-                    hintStyle: TextStyle(color: Colors.grey),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8), // Centers text vertically
-                  ),
+      backgroundColor: Colors.black, // Friend's Dark Theme
+      body: GestureDetector(
+        onHorizontalDragEnd: (details) {
+          // Swipe right to open scanner (Friend's feature)
+          if (details.primaryVelocity! > 0) {
+            _onScanPressed();
+          }
+        },
+        child: SafeArea(
+          child: Column(
+            children: [
+              // --- Custom Top Bar ---
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                child: Row(
+                  children: [
+                    // Profile Button (Placeholder)
+                    GestureDetector(
+                      onTap: () {
+                        // TODO: Navigate to ProfileScreen
+                      },
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.grey[800],
+                        child: const Icon(Icons.person, color: Colors.white70),
+                      ),
+                    ),
+                    
+                    const SizedBox(width: 12),
+                    
+                    // Search Bar
+                    Expanded(
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[900],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white, fontSize: 15),
+                          onSubmitted: _handleSearch,
+                          textInputAction: TextInputAction.search,
+                          decoration: InputDecoration(
+                            hintText: 'Search (e.g. "Investors in Denver")',
+                            hintStyle: TextStyle(color: Colors.grey[500], fontSize: 15),
+                            prefixIcon: Icon(Icons.search, color: Colors.grey[500], size: 20),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                    ),
+                    
+                    const SizedBox(width: 12),
+                    
+                    // Add Button
+                    GestureDetector(
+                      onTap: _onManualAddPressed,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: Colors.blue, // Friend's accent color
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.add, color: Colors.white, size: 24),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+
+              // --- Content Body ---
+              Expanded(
+                child: _buildBody(),
+              ),
+            ],
+          ),
         ),
       ),
       
-      body: _buildBody(),
-      
+      // --- Bottom Navigation ---
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.black,
+        selectedItemColor: Colors.blue,
+        unselectedItemColor: Colors.grey[600],
         onTap: (index) {
-          if (index == 1) {
-            _onScanPressed(); // Middle button opens Scanner
+          if (index == 2) {
+            _onScanPressed(); // Middle action
           } else {
             setState(() => _selectedIndex = index);
           }
         },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: "Chat AI",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.qr_code_scanner),
-            label: "Scan",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: "Timeline",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: 'AI Chat'),
+          BottomNavigationBarItem(icon: Icon(Icons.qr_code_scanner), label: 'Scan'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Timeline'),
         ],
       ),
     );
   }
 
+  // Switches between the main views based on the Bottom Nav
   Widget _buildBody() {
-    if (_selectedIndex == 0) {
-      return const ChatScreen();
-    } else if (_selectedIndex == 2) {
-      return const TimelineScreen();
-    }
+    if (_selectedIndex == 1) return const ChatScreen();
+    if (_selectedIndex == 3) return const TimelineScreen();
     
-    // Default View: Contact List (Filtered)
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    // Index 0: Home / Contact List
+    return _buildContactList();
+  }
+
+  Widget _buildContactList() {
+    // Header Stats
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_filteredContacts.length} Contacts',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // The List
+        Expanded(
+          child: _isLoading 
+            ? const Center(child: CircularProgressIndicator(color: Colors.blue))
+            : _filteredContacts.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    itemCount: _filteredContacts.length,
+                    itemBuilder: (context, index) {
+                      final contact = _filteredContacts[index];
+                      
+                      // Logic for Section Headers (A, B, C...)
+                      bool showSection = index == 0;
+                      if (index > 0) {
+                        final prevName = _filteredContacts[index - 1].name;
+                        if (contact.name.isNotEmpty && prevName.isNotEmpty) {
+                          showSection = contact.name[0].toUpperCase() != prevName[0].toUpperCase();
+                        }
+                      }
+                      
+                      return _buildContactTile(contact, showSection, index == _filteredContacts.length - 1);
+                    },
+                  ),
+        ),
+      ],
+    );
+  }
+
+  // Friend's "Tile" Design adapted for Real Data
+  Widget _buildContactTile(Contact contact, bool showSection, bool isLast) {
+    String initials = contact.name.isNotEmpty ? contact.name[0].toUpperCase() : "?";
     
-    if (_allContacts.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    if (_filteredContacts.isEmpty) {
-      return const Center(child: Text("No contacts match your search."));
-    }
-
-    return ListView.builder(
-      itemCount: _filteredContacts.length,
-      padding: const EdgeInsets.all(8),
-      itemBuilder: (context, index) {
-        return ContactCard(
-          contact: _filteredContacts[index],
-          onTap: () {
-            // TODO: Open Detail Screen
-          },
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showSection)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            color: Colors.black,
+            child: Text(
+              initials,
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              // TODO: Navigate to Contact Detail Screen
+              // Navigator.push(...)
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.blue,
+                    child: Text(
+                      initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          contact.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          contact.company ?? contact.title ?? "No Details",
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey[600],
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (!isLast)
+          Padding(
+            padding: const EdgeInsets.only(left: 80),
+            child: Divider(
+              height: 1,
+              thickness: 0.3,
+              color: Colors.grey[850],
+            ),
+          ),
+      ],
     );
   }
 
@@ -215,16 +363,16 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.people_outline, size: 64, color: Colors.grey.shade300),
+          Icon(Icons.contacts_outlined, size: 80, color: Colors.grey[700]),
           const SizedBox(height: 16),
           Text(
-            "Your network is empty",
-            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+            'No contacts found',
+            style: TextStyle(color: Colors.grey[500], fontSize: 18, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
-          const Text(
-            "Scan a card or tap + to add manually",
-            style: TextStyle(color: Colors.grey),
+          Text(
+            'Tap + to add your first contact',
+            style: TextStyle(color: Colors.grey[600], fontSize: 14),
           ),
         ],
       ),
