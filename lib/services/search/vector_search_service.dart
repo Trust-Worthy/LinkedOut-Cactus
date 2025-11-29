@@ -5,98 +5,101 @@ import '../../data/repositories/contact_repository.dart';
 import '../../core/utils/vector_utils.dart';
 import '../ai/cactus_service.dart';
 
+class RAGResponse {
+  final String narrative;
+  final List<Contact> sources;
+
+  RAGResponse({required this.narrative, required this.sources});
+}
+
 class VectorSearchService {
   final ContactRepository _repository;
   final CactusService _aiService;
 
   VectorSearchService(this._repository, this._aiService);
 
-  /// 1. SEMANTIC SEARCH (Retrieval)
-  Future<List<Contact>> search(String query, {int limit = 5}) async {
+  /// 1. PURE VECTOR SEARCH (Retrieval)
+  Future<List<Contact>> search(String query, {double threshold = 0.20, int limit = 10}) async {
     final allContacts = await _repository.getAllContacts();
-    
-    // Safety check for empty DB
     if (allContacts.isEmpty) return [];
 
-    // 1. Embed the User's Query
     final queryEmbedding = await _aiService.getEmbedding(query);
-    
-    if (queryEmbedding.isEmpty) {
-      // Fallback to keyword if AI fails
-      return _keywordSearch(allContacts, query, limit);
-    }
+    if (queryEmbedding.isEmpty) return [];
 
-    // 2. Score Matches (Cosine Similarity)
     List<MapEntry<Contact, double>> scoredContacts = [];
-    
     for (var contact in allContacts) {
       if (contact.embedding != null) {
-        // Dimension Mismatch Check
-        if (contact.embedding!.length != queryEmbedding.length) {
-          continue; 
-        }
+        if (contact.embedding!.length != queryEmbedding.length) continue;
 
         final score = VectorUtils.cosineSimilarity(queryEmbedding, contact.embedding!);
-
-        // RELAXED THRESHOLD: 0.15 allows for typos and loose associations
-        if (score > 0.15) { 
+        if (score > threshold) { 
           scoredContacts.add(MapEntry(contact, score));
         }
       }
     }
 
-    // 3. Fallback Mechanism
-    if (scoredContacts.isEmpty) {
-       return _keywordSearch(allContacts, query, limit);
-    }
-
-    // 4. Sort & Filter
     scoredContacts.sort((a, b) => b.value.compareTo(a.value));
     return scoredContacts.take(limit).map((e) => e.key).toList();
   }
 
-  List<Contact> _keywordSearch(List<Contact> contacts, String query, int limit) {
-    final lowerQuery = query.toLowerCase();
-    return contacts.where((contact) {
-      final text = "${contact.name} ${contact.company ?? ''} ${contact.title ?? ''} ${contact.addressLabel ?? ''}".toLowerCase();
-      return text.contains(lowerQuery);
-    }).take(limit).toList();
-  }
+  /// 2. RAG GENERATION (Retrieval + Generation)
+  Future<RAGResponse> queryWithRAG(String userQuestion) async {
+    List<Contact> relevantContacts;
+    String systemPrompt;
 
-  /// 2. RAG GENERATION (The "Smart" Part)
-  Future<String> askYourNetwork(String userQuestion) async {
-    // A. RETRIEVE: Find relevant contacts from Isar
-    final relevantContacts = await search(userQuestion, limit: 5);
+    // --- A. STRATEGY: TIMELINE NARRATIVE ---
+    if (userQuestion.toLowerCase().contains("timeline") || 
+        userQuestion.toLowerCase().contains("journey") || 
+        userQuestion.toLowerCase().contains("history")) {
+      
+      debugPrint("🕰️ Triggering Timeline Narrative...");
+      // Get all contacts, Sort Chronologically (Oldest -> Newest)
+      relevantContacts = await _repository.getAllContacts();
+      relevantContacts.sort((a, b) => a.metAt.compareTo(b.metAt));
+      
+      // Limit to last 15 interactions to fit in context window
+      if (relevantContacts.length > 15) {
+        relevantContacts = relevantContacts.sublist(relevantContacts.length - 15);
+      }
+      
+      systemPrompt = "You are a biographer. Construct a chronological narrative of the user's networking journey based on the dates provided. Highlight key locations and role transitions.";
     
-    if (relevantContacts.isEmpty) {
-      return "I searched your network but couldn't find anyone matching that description.";
+    } else {
+    // --- B. STRATEGY: SEMANTIC LOOKUP ---
+      debugPrint("🔍 Triggering Semantic Search...");
+      relevantContacts = await search(userQuestion, threshold: 0.20, limit: 6);
+      
+      if (relevantContacts.isEmpty) {
+        return RAGResponse(
+          narrative: "I couldn't find anyone in your network matching that description.",
+          sources: []
+        );
+      }
+      systemPrompt = "You are a helpful networking assistant. Answer the user's question using ONLY the context provided below. Be conversational but concise.";
     }
 
-    // B. AUGMENT: Create a dense, information-rich context block
-    // We include the ID so the LLM can reference it
-    String contextData = relevantContacts.map((c) => 
-      "ID:${c.id} | Name:${c.name} | Role:${c.title ?? 'N/A'} @ ${c.company ?? 'N/A'} | Loc:${c.addressLabel ?? 'N/A'} | Notes:${c.notes ?? ''}"
+    // C. AUGMENT (Build Context)
+    String contextBlock = relevantContacts.map((c) => 
+      """
+      - Name: ${c.name}
+      - Role: ${c.title ?? 'N/A'} at ${c.company ?? 'N/A'}
+      - Location: ${c.addressLabel ?? 'Unknown'}
+      - Met Date: ${c.metAt.toString().substring(0, 10)}
+      - Notes: ${c.notes ?? ''}
+      """
     ).join("\n");
 
-    // C. GENERATE: "Router" Style Prompt
-    // We instruct the AI to act as a strict data fetcher, not a conversationalist.
+    // D. GENERATE (Ask AI)
     final messages = [
-      ChatMessage(
-        role: "system", 
-        content: """
-You are a precision networking assistant. 
-1. Answer the user's question using ONLY the provided Context.
-2. Be extremely concise. Do not use filler words.
-3. Format every person found as: - [Name](ID) - 1 sentence detail.
-4. If the user asks for a list (e.g. 'who in Colorado'), just list them.
-        """.trim()
-      ),
+      ChatMessage(role: "system", content: systemPrompt),
       ChatMessage(
         role: "user", 
-        content: "Context:\n$contextData\n\nQuestion: $userQuestion"
+        content: "Context from my network:\n$contextBlock\n\nQuestion/Task: $userQuestion"
       )
     ];
 
-    return await _aiService.generateChatResponse(messages);
+    final narrative = await _aiService.generateChatResponse(messages);
+
+    return RAGResponse(narrative: narrative, sources: relevantContacts);
   }
 }

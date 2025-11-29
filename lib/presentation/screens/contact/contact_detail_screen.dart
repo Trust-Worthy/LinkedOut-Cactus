@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
+import '../../../services/storage/image_storage.dart';
 
 class ContactDetailScreen extends StatefulWidget {
   final Contact contact;
@@ -122,10 +125,66 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      // Edit Image Placeholder
+                                      // Edit Image Placeholder
                       GestureDetector(
-                        onTap: () {
-                          // TODO: Add image picker logic
+                        onTap: () async {
+                          // Show options: Camera / Gallery / Remove
+                          showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            builder: (ctx) => Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey[900],
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ListTile(
+                                    leading: const Icon(Icons.photo_library, color: Colors.white),
+                                    title: const Text('Choose from gallery', style: TextStyle(color: Colors.white)),
+                                    onTap: () async {
+                                      Navigator.pop(ctx);
+                                      final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+                                      if (picked != null) {
+                                        final bytes = await picked.readAsBytes();
+                                        final ext = picked.path.split('.').last;
+                                        final fileName = 'avatar_${_contact.id}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+                                        final saved = await ImageStorage.saveAvatar(bytes, fileName);
+                                        setState(() { _contact.avatarPath = saved; });
+                                      }
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.camera_alt, color: Colors.white),
+                                    title: const Text('Take a photo', style: TextStyle(color: Colors.white)),
+                                    onTap: () async {
+                                      Navigator.pop(ctx);
+                                      final picked = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+                                      if (picked != null) {
+                                        final bytes = await picked.readAsBytes();
+                                        final ext = picked.path.split('.').last;
+                                        final fileName = 'avatar_${_contact.id}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+                                        final saved = await ImageStorage.saveAvatar(bytes, fileName);
+                                        setState(() { _contact.avatarPath = saved; });
+                                      }
+                                    },
+                                  ),
+                                  if (_contact.avatarPath != null)
+                                    ListTile(
+                                      leading: const Icon(Icons.delete, color: Colors.red),
+                                      title: const Text('Remove photo', style: TextStyle(color: Colors.red)),
+                                      onTap: () async {
+                                        Navigator.pop(ctx);
+                                        await ImageStorage.deleteFileIfExists(_contact.avatarPath);
+                                        setState(() { _contact.avatarPath = null; });
+                                      },
+                                    ),
+                                  const SizedBox(height: 8),
+                                ],
+                              ),
+                            ),
+                          );
                         },
                         child: Stack(
                           children: [
@@ -270,17 +329,23 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.blue,
-                    child: Text(
-                      initials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 40,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                  Builder(
+                    builder: (_) {
+                      final hasAvatar = _contact.avatarPath != null && File(_contact.avatarPath!).existsSync();
+                      return CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.blue,
+                        backgroundImage: hasAvatar ? FileImage(File(_contact.avatarPath!)) : null,
+                        child: hasAvatar ? null : Text(
+                          initials,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 40,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   Text(

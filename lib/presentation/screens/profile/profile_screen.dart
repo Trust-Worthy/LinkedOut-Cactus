@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../../../data/models/contact.dart';
 import '../../../data/repositories/contact_repository.dart';
+import '../../../services/storage/image_storage.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -68,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     contact.company = _companyController.text;
     contact.title = _titleController.text;
     contact.notes = _bioController.text; // "Bio" is stored in notes
+    // avatarPath is already set by the image picker, just ensure it persists
     
     await repo.saveUserProfile(contact);
     
@@ -103,10 +107,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 // Avatar
                 Center(
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.grey[800],
-                    child: const Icon(Icons.person, size: 60, color: Colors.white),
+                  child: GestureDetector(
+                    onTap: () async {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[900],
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.photo_library, color: Colors.white),
+                                title: const Text('Choose from gallery', style: TextStyle(color: Colors.white)),
+                                onTap: () async {
+                                  Navigator.pop(ctx);
+                                  final picked = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+                                  if (picked != null) {
+                                    final bytes = await picked.readAsBytes();
+                                    final ext = picked.path.split('.').last;
+                                    final fileName = 'profile_avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+                                    final saved = await ImageStorage.saveAvatar(bytes, fileName);
+                                    setState(() { _userProfile?.avatarPath = saved; });
+                                  }
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.camera_alt, color: Colors.white),
+                                title: const Text('Take a photo', style: TextStyle(color: Colors.white)),
+                                onTap: () async {
+                                  Navigator.pop(ctx);
+                                  final picked = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+                                  if (picked != null) {
+                                    final bytes = await picked.readAsBytes();
+                                    final ext = picked.path.split('.').last;
+                                    final fileName = 'profile_avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+                                    final saved = await ImageStorage.saveAvatar(bytes, fileName);
+                                    setState(() { _userProfile?.avatarPath = saved; });
+                                  }
+                                },
+                              ),
+                              if (_userProfile?.avatarPath != null)
+                                ListTile(
+                                  leading: const Icon(Icons.delete, color: Colors.red),
+                                  title: const Text('Remove photo', style: TextStyle(color: Colors.red)),
+                                  onTap: () async {
+                                    Navigator.pop(ctx);
+                                    await ImageStorage.deleteFileIfExists(_userProfile?.avatarPath);
+                                    setState(() { _userProfile?.avatarPath = null; });
+                                  },
+                                ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    child: Stack(
+                      children: [
+                        Builder(
+                          builder: (_) {
+                            final hasAvatar = _userProfile?.avatarPath != null && File(_userProfile!.avatarPath!).existsSync();
+                            return CircleAvatar(
+                              radius: 50,
+                              backgroundColor: Colors.blue,
+                              backgroundImage: hasAvatar ? FileImage(File(_userProfile!.avatarPath!)) : null,
+                              child: hasAvatar ? null : const Icon(Icons.person, size: 60, color: Colors.white),
+                            );
+                          },
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.black, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 30),
@@ -132,23 +223,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-    );
-  }
+        );
+      }
 
-  Widget _buildDarkField(String label, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType}) {
-    return TextFormField(
-      controller: controller,
-      style: const TextStyle(color: Colors.white),
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      validator: (v) => v!.isEmpty ? "Required" : null,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: Colors.grey[400]),
-        filled: true,
-        fillColor: Colors.grey[900],
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      ),
-    );
-  }
+      Widget _buildDarkField(String label, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType}) {
+      return TextFormField(
+        controller: controller,
+        style: const TextStyle(color: Colors.white),
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        validator: (v) => v!.isEmpty ? "Required" : null,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: Colors.grey[400]),
+          filled: true,
+          fillColor: Colors.grey[900],
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        ),
+      );
+    }
 }
