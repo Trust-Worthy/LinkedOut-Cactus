@@ -1,11 +1,14 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 
 class VectorUtils {
   /// Calculates Cosine Similarity between two vectors.
   /// Returns a value between -1.0 (opposite) and 1.0 (identical).
   static double cosineSimilarity(List<double> vectorA, List<double> vectorB) {
     if (vectorA.length != vectorB.length) {
-      throw Exception("Vectors must have the same length");
+      // Fail safe instead of crashing
+      debugPrint("❌ ERROR: Embedding dimension mismatch! A=${vectorA.length}, B=${vectorB.length}");
+      return 0.0;
     }
 
     double dotProduct = 0.0;

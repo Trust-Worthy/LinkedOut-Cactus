@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 import '../local/database/isar_service.dart';
 import '../models/contact.dart';
@@ -8,13 +9,57 @@ class ContactRepository {
 
   ContactRepository(this._isarService);
 
-  /// Saves a contact and auto-generates its AI embedding
   Future<void> saveContact(Contact contact) async {
     final isar = await _isarService.db;
 
-    // 1. Prepare text for embedding
-    // We combine important fields so the AI understands the full context
-    final String textToEmbed = """
+    final String textToEmbed = _buildContactText(contact);
+
+    try {
+      // Only generate if not already present or if you want to force update
+      // For now, we always generate to ensure freshness
+      final embedding = await CactusService.instance.getEmbedding(textToEmbed);
+      if (embedding.isNotEmpty) {
+        contact.embedding = embedding;
+      }
+    } catch (e) {
+      debugPrint("Warning: Failed to generate embedding: $e");
+    }
+
+    await isar.writeTxn(() async {
+      await isar.contacts.put(contact);
+    });
+  }
+
+  /// REGENERATION LOGIC: Call this to fix incompatible embeddings
+  Future<void> regenerateAllEmbeddings() async {
+    final isar = await _isarService.db;
+    final allContacts = await isar.contacts.where().findAll();
+    
+    debugPrint('🔄 Regenerating embeddings for ${allContacts.length} contacts...');
+    
+    await isar.writeTxn(() async {
+      for (var contact in allContacts) {
+        try {
+          final text = _buildContactText(contact);
+          final embedding = await CactusService.instance.getEmbedding(text);
+          
+          if (embedding.isNotEmpty) {
+            contact.embedding = embedding;
+            await isar.contacts.put(contact); // Update existing record
+            debugPrint('✅ Updated embedding for ${contact.name}');
+          } else {
+            debugPrint('⚠️ Empty embedding generated for ${contact.name}');
+          }
+        } catch (e) {
+          debugPrint('❌ Error updating ${contact.name}: $e');
+        }
+      }
+    });
+    debugPrint('✨ Done! All embeddings regenerated.');
+  }
+
+  String _buildContactText(Contact contact) {
+    return """
       Name: ${contact.name}
       Company: ${contact.company ?? ''}
       Title: ${contact.title ?? ''}
@@ -23,23 +68,6 @@ class ContactRepository {
       Event: ${contact.eventName ?? ''}
       Tags: ${contact.tags?.join(', ') ?? ''}
     """.trim();
-
-    // 2. Generate Embedding via Cactus
-    // We do this BEFORE writing to DB
-    try {
-      final embedding = await CactusService.instance.getEmbedding(textToEmbed);
-      if (embedding.isNotEmpty) {
-        contact.embedding = embedding;
-      }
-    } catch (e) {
-      print("Warning: Failed to generate embedding: $e");
-      // We proceed to save anyway, so we don't lose user data
-    }
-
-    // 3. Save to Isar
-    await isar.writeTxn(() async {
-      await isar.contacts.put(contact);
-    });
   }
 
   Future<List<Contact>> getAllContacts() async {
@@ -47,7 +75,6 @@ class ContactRepository {
     return await isar.contacts.where().sortByMetAtDesc().findAll();
   }
 
-  /// Delete a contact
   Future<void> deleteContact(int id) async {
     final isar = await _isarService.db;
     await isar.writeTxn(() async {
