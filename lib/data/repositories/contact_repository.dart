@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import '../local/database/isar_service.dart';
 import '../models/contact.dart';
 import '../../services/ai/cactus_service.dart';

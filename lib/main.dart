@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 // Services
 import 'services/location/offline_geocoding_service.dart';
 import 'services/search/vector_search_service.dart';
 import 'services/ai/cactus_service.dart';
-import 'services/search/smart_search_service.dart'; // ADD THIS IMPORT
-import 'services/search/advanced_search_service.dart'; // ADD THIS
+import 'services/auth/auth_provider.dart';
 // Data & App
 import 'app.dart';
 import 'data/local/database/isar_service.dart';
@@ -18,12 +16,15 @@ void main() async {
 
   final isarService = IsarService();
   await OfflineGeocodingService.instance.initialize();
-  final prefs = await SharedPreferences.getInstance();
-  final hasOnboarded = prefs.getBool('has_onboarded') ?? false;
 
   runApp(
     MultiProvider(
       providers: [
+        // Auth Provider - Must be first to initialize before other services
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider()..initialize(),
+        ),
+        
         Provider<ContactRepository>(create: (_) => ContactRepository(isarService)),
         
         // USE PURE VECTOR SEARCH
@@ -34,7 +35,7 @@ void main() async {
           ),
         ),
       ],
-      child: LinkedOutApp(startOnboarding: !hasOnboarded),
+      child: const LinkedOutApp(),
     ),
   );
 }

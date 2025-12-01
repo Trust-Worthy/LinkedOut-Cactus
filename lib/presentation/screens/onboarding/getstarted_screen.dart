@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import '../../../services/ai/cactus_service.dart';
-// FIX: Correct relative import path
+import '../../../services/auth/auth_provider.dart';
 import '../home/home_screen.dart'; 
 
 class GetStartedScreen extends StatefulWidget {
@@ -36,11 +36,12 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         },
       );
 
-      // 2. Mark onboarding as complete
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('has_onboarded', true);
+      // 2. Mark onboarding as complete in AuthProvider
+      if (mounted) {
+        await Provider.of<AuthProvider>(context, listen: false).completeOnboarding();
+      }
 
-      // 3. Navigate
+      // 3. Navigate (AuthProvider will handle routing)
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomeScreen()),
